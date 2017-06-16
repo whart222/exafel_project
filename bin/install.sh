@@ -35,8 +35,10 @@ function psanaEnvVar(){ #May not be necessary
 
 #pass cci username, github username and number of compilation cores as args
 function setupcctbx(){
-  if [ ! -e mkdir $PERM/cctbx.xfel ]; then
+  if [ ! -e $PERM/cctbx.xfel ]; then
     echo "cctbx installer not found. Acquiring."
+    mkdir $PERM/cctbx.xfel; 
+    cd $PERM/cctbx.xfel
     wget https://raw.githubusercontent.com/cctbx/cctbx_project/master/libtbx/auto_build/bootstrap.py --no-check-certificate --no-check-certificate
   fi
   python bootstrap.py hot update --builder=xfel --cciuser=$1 --sfuser=$2
