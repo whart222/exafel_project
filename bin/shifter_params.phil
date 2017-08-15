@@ -1,0 +1,21 @@
+input{
+	experiment=cxid9114
+	dispatcher=cctbx.xfel.xtc_process
+	target=process.phil
+}
+output{
+	split_logs=True
+}
+mp{
+	wall_time=180
+	method=shifter
+	shifter{
+		submit_command = "sbatch "
+		sbatch_script_template=shifter_sbatch.sh
+		srun_script_template=shifter_srun.sh
+		partition=regular
+		nnodes=8
+		nproc=544
+	}
+}
+dry_run=True
