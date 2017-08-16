@@ -3,7 +3,7 @@
 #SBATCH --job-name=cxid9114_index
 #SBATCH --time=<walltime>
 #SBATCH --nodes=<nnodes>
-#SBATCH --constraint=haswell
+#SBATCH --constraint=knl
 #SBATCH --image=docker:mlxd/xfel:lq79
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=loriordan@lbl.gov
