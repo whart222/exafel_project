@@ -56,6 +56,11 @@ ${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
 export MULTINODE=False
 ${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
 
+Still to implement:
+1) Dependence of merge & xmerge on MySQL
+2) MPI parallelism for merge
+3) output the Table 1 + 2 json at the end of script.
+
 
 
 
