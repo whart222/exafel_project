@@ -1,0 +1,64 @@
+Nick Sauter notes for installing and running the merging demo
+
+Installation of the Conda environment 
+
+Instructions for 0917-sprint-CCTBX + SCIPY build are based on https://exafel.github.io/docs/psana-cctbx-install.  
+1. Change to new directory $CONDA_ROOT in bash
+2. Install Miniconda for Python 2.7 (64-bit) to directory $CONDA_ROOT/miniconda  [do not prepend to .bashrc]
+3. $CONDA_ROOT/miniconda/bin/conda update -y conda
+4. $CONDA_ROOT/miniconda/bin/conda create -n myEnv
+5. source $CONDA_ROOT/miniconda/bin/activate myEnv
+6. $CONDA_ROOT/miniconda/bin/conda install -y --channel lcls-rhel7 psana-conda
+7. $CONDA_ROOT/miniconda/bin/conda install -y IPython h5py mpich2 wxpython pillow libtiff
+
+Installation of CCTBX-XFEL
+
+8. cd $CONDA_ROOT
+9. which python # confirm it is the miniconda version
+10. curl -L https://raw.githubusercontent.com/ExaFEL/cctbx_project/sept_sprint/libtbx/auto_build/bootstrap.py -o bootstrap.py
+11. python bootstrap.py hot update --builder=xfel --sfuser=<github user name>
+12. python bootstrap.py build --builder=xfel --with-python=`which python` --nproc=<# cores available for compile> 
+13. The path environment variables must be set up in each new terminal window
+    source $CONDA_ROOT/build/setpaths.sh
+14. When using matplotlib, always set 
+    export BOOST_ADAPTBX_FPE_DEFAULT=1
+
+Installation of separate PHENIX build
+
+15. cd $PHENIX_ROOT # new directory
+16. request a download password from http://phenix-online.org
+17. download the following source tarfile with password credentials:
+    https://www.phenix-online.org/download/phenix/nightly/send_octet_stream.cgi?version=dev-2880&file=phenix-installer-dev-2880-source.tar.gz
+18. Untar the file
+19. cd phenix-installer-dev-2880-source
+20. cp modules/cctbx_project/libtbx/auto_build/bootstrap.py .
+21. python bootstrap.py build --builder=phenix --with-python=`which python` --nproc=<# cores available for compile> # Note:  fatal error message after gui dispatcher step is of no consequence
+
+Running the LD91, run 108 example
+
+A. set these additional environment variables:
+export TAG=r0108_only # a unique tag for this merging trial
+export TARDATA=/net/viper/raid1/sauter/0917sprint/data/TAR_95-114/r0108*.tar # glob describing path of all integration tar files
+export MERGE_ROOT=<new directory name> # absolute path of a top-level directory for the merging project
+$TAG is associated with a particular $TARDATA.  
+$MERGE_ROOT will be the master directory above several $TAG/$TARDATA pairs.
+
+export MULTINODE=True|False
+Note:  the script needs to be run twice.  Once with MULTINODE==True for postrefinement.
+Second time with MULTINODE==False for merging stats, xtriage, phenix.refine, and anomalous stats
+
+B. Download reference files for lysozyme:
+cd $MERGE_ROOT; phenix.fetch_pdb --mtz 4ngz; cd -
+
+C. Run the script
+export MULTINODE=True
+${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
+export MULTINODE=False
+${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
+
+
+
+
+
+
+
