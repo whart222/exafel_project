@@ -75,7 +75,17 @@ export MYSQL_PASSWD
 export MYSQL_DATABASE
 
 export MULTINODE=True
-${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
+${CONDA_ROOT}/modules/exafel_project/nks/merge_v02.sh
 export MULTINODE=False
-${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
+${CONDA_ROOT}/modules/exafel_project/nks/merge_v02.sh
+
+Version v03 of the script.  Use MPI parallelism
+-----------------------------------------------
+Works on standalone Linux box, not at NERSC, apparently the MPI
+spawn option is not available there (will fix later).
+
+export MULTINODE=True
+${CONDA_ROOT}/modules/exafel_project/nks/merge_v03.sh
+export MULTINODE=False
+${CONDA_ROOT}/modules/exafel_project/nks/merge_v03.sh
 
