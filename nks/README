@@ -1,7 +1,7 @@
 Nick Sauter notes for installing and running the merging demo
 
 Installation of the Conda environment 
-
+-------------------------------------
 Instructions for 0917-sprint-CCTBX + SCIPY build are based on https://exafel.github.io/docs/psana-cctbx-install.  
 1. Change to new directory $CONDA_ROOT in bash
 2. Install Miniconda for Python 2.7 (64-bit) to directory $CONDA_ROOT/miniconda  [do not prepend to .bashrc]
@@ -12,7 +12,7 @@ Instructions for 0917-sprint-CCTBX + SCIPY build are based on https://exafel.git
 7. $CONDA_ROOT/miniconda/bin/conda install -y IPython h5py mpich2 wxpython pillow libtiff
 
 Installation of CCTBX-XFEL
-
+--------------------------
 8. cd $CONDA_ROOT
 9. which python # confirm it is the miniconda version
 10. curl -L https://raw.githubusercontent.com/ExaFEL/cctbx_project/sept_sprint/libtbx/auto_build/bootstrap.py -o bootstrap.py
@@ -24,7 +24,7 @@ Installation of CCTBX-XFEL
     export BOOST_ADAPTBX_FPE_DEFAULT=1
 
 Installation of separate PHENIX build
-
+-------------------------------------
 15. cd $PHENIX_ROOT # new directory
 16. request a download password from http://phenix-online.org
 17. download the following source tarfile with password credentials:
@@ -35,7 +35,7 @@ Installation of separate PHENIX build
 21. python bootstrap.py build --builder=phenix --with-python=`which python` --nproc=<# cores available for compile> # Note:  fatal error message after gui dispatcher step is of no consequence
 
 Running the LD91, run 108 example
-
+---------------------------------
 A. set these additional environment variables:
 export TAG=r0108_only # a unique tag for this merging trial
 export TARDATA=/net/viper/raid1/sauter/0917sprint/data/TAR_95-114/r0108*.tar # glob describing path of all integration tar files
@@ -61,9 +61,21 @@ Still to implement:
 2) MPI parallelism for merge
 3) output the Table 1 + 2 json at the end of script.
 
+Version v02 of the script.  Use MySQL database backend for merging
+------------------------------------------------------------------
+Install the Python database client:
+source $CONDA_ROOT/build/setpaths.sh
+libtbx.python -m pip install mysql-python
 
+Define the appropriate database credentials:
+export MYSQL_HOST
+export MYSQL_PORT
+export MYSQL_USER
+export MYSQL_PASSWD
+export MYSQL_DATABASE
 
-
-
-
+export MULTINODE=True
+${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
+export MULTINODE=False
+${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
 
