@@ -37,7 +37,7 @@ function psanaEnvVar(){ #May not be necessary
 function setupcctbx(){
   if [ ! -e $PERM/cctbx.xfel ]; then
     echo "cctbx installer not found. Acquiring."
-    mkdir $PERM/cctbx.xfel; 
+    mkdir $PERM/cctbx.xfel;
     cd $PERM/cctbx.xfel
     wget https://raw.githubusercontent.com/cctbx/cctbx_project/master/libtbx/auto_build/bootstrap.py --no-check-certificate --no-check-certificate
   fi

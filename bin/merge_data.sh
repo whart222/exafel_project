@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#This file, while not fully necessary with cxi.merge on the path, is used to showcase the sample parameters for processing cxid9114 with a single KNL node. The model file can be added manually from the PDB, or downloaded using phenix.model 
+#This file, while not fully necessary with cxi.merge on the path, is used to showcase the sample parameters for processing cxid9114 with a single KNL node. The model file can be added manually from the PDB, or downloaded using phenix.model
 
 #DATA_DIR contains the path to the integrated pickle files that will be used in merging
 DATA_DIR=/global/cscratch1/sd/mlxd/DataProc/cxid9114/processing/batch_metrology_r0113_013/r0113/000/out/untar/r0113/000/out/

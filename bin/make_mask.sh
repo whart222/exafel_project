@@ -8,7 +8,7 @@
 #SBATCH --mail-user=loriordan@lbl.gov
 #SBATCH --volume="/global/cscratch1/sd/mlxd/DataProc/cxid9114/cxi:/reg/d/psdm/CXI;/global/cscratch1/sd/mlxd/DataProc/cxid9114/cxi:/reg/d/psdm/cxi;/global/cscratch1/sd/mlxd/DataProc/cxid9114/regg/g:/reg/g"
 
-if [ ! -f ./mask.sh ]; then 
+if [ ! -f ./mask.sh ]; then
     echo "#\!/bin/bash" >> ./mask.sh
     echo "export SIT_DATA=/reg/g/psdm/data"  >> ./mask.sh
     echo "export SIT_PSDM_DATA=/reg/d/psdm"  >> ./mask.sh
