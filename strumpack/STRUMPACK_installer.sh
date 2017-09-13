@@ -26,6 +26,13 @@ fi
 pushd . >/dev/null
 cd downloads
 
+# Setup NERSC environment for building
+if [ "$NERSC_HOST" != "cori" ]; then
+  module load python/2.7-anaconda
+  source activate ${1} ##Pass conda env name as argument
+fi
+
+
 #################################################
 # Acquire STRUMPACK-sparse and all dependencies #
 #################################################
@@ -119,18 +126,18 @@ export prefix=$INSTALL_DIR
 export PATH=$PATH:$PWD/builds/bin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/builds/lib:$PWD/builds/lib64
 
-LIB_DIR="-L$PWD/builds/lib -L$PWD/builds/lib64";
-INC_DIR="-I$PWD/builds/include";
+LIB_DIR="-L$PWD/builds/lib -L$PWD/builds/lib64 -L$CONDA_PREFIX/lib";
+INC_DIR="-I$PWD/builds/include -I$CONDA_PREFIX/include";
 
 #Get core count/2
-let proc=$(getconf _NPROCESSORS_ONLN)/2
+let proc=$(getconf _NPROCESSORS_ONLN)/4
 cd deps
 
 
 # Build all dependencies and dependency dependencies
 
 #OPENMPI: Optional if to be included from modules/conda 
-if [[ $NERSC_HOST -ne "cori" ]]; then
+if [ "$NERSC_HOST" != "cori" ]; then
   cd ./openmpi-2.1.1
   ./configure --prefix=$INSTALL_DIR --enable-mpi-thread-multiple
   make -j$(echo ${proc}) && make install
@@ -141,7 +148,7 @@ else
 fi
 
 cd ./metis-5.1.0;
-if [[ $NERSC_HOST -ne "cori" ]]; then
+if [ "$NERSC_HOST" != "cori" ]; then
   make config cc=mpicc prefix=$INSTALL_DIR
 else
   make config cc=cc prefix=$INSTALL_DIR
@@ -151,7 +158,7 @@ cd ..
 
 #Needs to have mpicc on the path; can install using conda install openmpi on Mac, or mpich/openmpi on linux
 cd ./parmetis-4.0.3
-if [[ $NERSC_HOST -ne "cori" ]]; then
+if [ "$NERSC_HOST" != "cori" ]; then
   make config cc=mpicc prefix=$INSTALL_DIR
 else
   make config cc=cc cxx=CC prefix=$INSTALL_DIR
@@ -165,27 +172,27 @@ cd ./scotch_6.0.4/src
 cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 ./Makefile.inc
 
 sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
-sed -i.bak 's/-DSCOTCH_PTHREAD//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
-sed -i.bak 's/-pthread//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
+#sed -i.bak 's/-DSCOTCH_PTHREAD//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
+#sed -i.bak 's/-pthread//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
 rm ./Makefile.inc.bak
 make scotch -j$(echo ${proc}) && make ptscotch -j$(echo ${proc}) && make install
 cd ../..
 
 # Install OpenBLAS; MKL might be a good option too
-if [[ $NERSC_HOST -ne "cori" ]]; then
+if [ "$NERSC_HOST" != "cori" ]; then
   cd ./OpenBLAS-0.2.20
   make -j$(echo ${proc}) && make PREFIX=$INSTALL_DIR install
   cd ..
 fi
 
-if [[ $NERSC_HOST -ne "cori" ]]; then
+if [ "$NERSC_HOST" != "cori" ]; then
   cd scalapack_installer
   python ./setup.py --downall --mpibindir=$INSTALL_DIR/bin --prefix=$INSTALL_DIR
   make -j$(echo ${proc}) && make install
   cd ..
 fi
 
-if [[ $NERSC_HOST -ne "cori" ]]; then #Not on a Cori node; use the locally built packages for all dependencies
+if [ "$NERSC_HOST" != "cori" ]; then #Not on a Cori node; use the locally built packages for all dependencies
   echo "Standard installation"
   pushd . > /dev/null;
   cd STRUMPACK
