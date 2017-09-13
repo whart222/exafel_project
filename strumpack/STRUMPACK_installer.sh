@@ -3,19 +3,15 @@
 # Set urls for packages
 STRUMPACK=https://github.com/pghysels/STRUMPACK.git
 METIS=http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
-OMPMETIS=http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/mt-metis-0.6.0.tar.gz
 PARMETIS=http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz
 SCOTCH=https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
 TCMALLOC=https://github.com/gperftools/gperftools/releases/download/gperftools-2.6.1/gperftools-2.6.1.tar.gz
 
 LAPACK=http://www.netlib.org/lapack/lapack-3.7.1.tgz
-#SCALAPACK=http://www.netlib.org/scalapack/scalapack.tgz
 SCALAPACK=http://www.netlib.org/scalapack/scalapack_installer.tgz
 OPENBLAS=http://github.com/xianyi/OpenBLAS/archive/v0.2.20.tar.gz
 CMAKE=https://cmake.org/files/v3.9/
 OPENMPI=https://www.open-mpi.org/software/ompi/v2.1/downloads/openmpi-2.1.1.tar.gz
-#BLACS=http://www.netlib.org/blacs/mpiblacs.tgz
-#BLACSPATCH=http://www.netlib.org/blacs/mpiblacs-patch03.tgz
 
 # Create directory structure
 if [ ! -d ./downloads ]; then
@@ -33,10 +29,10 @@ cd downloads
 
 # Setup NERSC environment for building
 if [ "$NERSC_HOST" == "cori" ]; then
-  module load python/2.7-anaconda
-  source activate ${1} ##Pass conda env name as argument
+  module load gcc
+  #module load python/2.7-anaconda
+  #source activate ${1} ##Pass conda env name as argument
 fi
-
 
 #################################################
 # Acquire STRUMPACK-sparse and all dependencies #
@@ -45,6 +41,11 @@ if [ ! -d ../deps/STRUMPACK ]; then
   echo "Downloading STRUMPACK"
   git clone $STRUMPACK
   cp -Rf STRUMPACK ../deps
+else
+  pushd . > /dev/null
+  cd ../deps/STRUMPACK;
+  git pull --rebase
+  popd > /dev/null
 fi
 
 # METIS v5.1.0 nested dissection
@@ -57,13 +58,6 @@ if [ ! -e METIS.tar.gz ]; then
     sed -i.bak 's/IDXTYPEWIDTH 32/IDXTYPEWIDTH 64/g' ../deps/metis-5.1.0/include/metis.h;
     rm ../deps/metis-5.1.0/include/metis.h.bak
   fi
-fi
-
-# Optional?: OpenMP METIS routines v0.6
-if [ ! -e OMPMETIS.tar.gz ]; then
-  echo "Downloading MT-METIS"
-  curl -L $OMPMETIS -o OMPMETIS.tar.gz
-  tar xvf OMPMETIS.tar.gz -C ../deps
 fi
 
 # PARMETIS v4.0.3: Parallel nested disection routines
@@ -115,20 +109,11 @@ if [ ! -e CMAKE.tar.gz ]; then
   cp -R $CMAKE_DIR/* ../builds
 fi
 
-# SCALAPACKs
+# SCALAPACK
 if [ ! -e SCALAPACK.tar.gz ]; then
   echo "Downloading SCALAPACK"
   curl -L $SCALAPACK -o SCALAPACK.tar.gz
   tar xvf SCALAPACK.tar.gz -C ../deps
-fi
-
-# BLACS: 
-if [ ! -e BLACS.tar.gz ]; then
-  echo "Downloading BLACS"
-  curl -L $BLACS -o BLACS.tar.gz
-  tar xvf BLACS.tar.gz -C ../deps
-  curl -L $BLACSPATCH -o BLACSPATCH.tar.gz
-  tar xvf BLACSPATCH.tar.gz -C ../deps
 fi
 
 popd > /dev/null
@@ -147,6 +132,7 @@ INC_DIR="-I$PWD/builds/include -I$CONDA_PREFIX/include "
 if [ "$NERSC_HOST" == "cori" ]; then
   LIB_DIR="$LIB_DIR $(cc --cray-print-opts=libs)"
   INC_DIR="$INC_DIR $(cc --cray-print-opts=cflags)"
+  
   #cc --cray-print-opts=cflags ##Get includes
   #cc --cray-print-opts=libs ##Get libs
   #cc --cray-print-opts=all ##Get both and all linker elements
@@ -164,7 +150,6 @@ if [ "$NERSC_HOST" != "cori" ]; then
   ./configure --prefix=$INSTALL_DIR --enable-mpi-thread-multiple
   make -j$(echo ${proc}) && make install
   cd ..
-  else
 else
   alias mpicc='cc'
   alias mpicxx='CC'
@@ -194,13 +179,12 @@ cd ..
 cd ./scotch_6.0.4/src
 cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 ./Makefile.inc
 sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
-#sed -i.bak 's/-DSCOTCH_PTHREAD//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
-#sed -i.bak 's/-pthread//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
+sed -i.bak 's/-DSCOTCH_PTHREAD//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
+sed -i.bak 's/-pthread//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
 if [ "$NERSC_HOST" == "cori" ]; then
   sed -i.bak 's/gcc/cc/' ./Makefile.inc #Change default compiler
   sed -i.bak 's/mpicc/cc/' ./Makefile.inc #Change default compiler for mpi
 fi
-
 rm ./Makefile.inc.bak
 make scotch -j$(echo ${proc}) && make ptscotch -j$(echo ${proc}) && make install
 cd ../..
@@ -219,12 +203,14 @@ if [ "$NERSC_HOST" != "cori" ]; then
   cd ..
 fi
 
+# STRUMPACK build
+# Parameterise for Cori login/Haswell, KNL, or non-Cori linux system
+pushd . > /dev/null;
+cd STRUMPACK
+mkdir build
+cd build
 if [ "$NERSC_HOST" != "cori" ]; then #Not on a Cori node; use the locally built packages for all dependencies
   echo "Standard installation"
-  pushd . > /dev/null;
-  cd STRUMPACK
-  mkdir build
-  cd build
   $INSTALL_DIR/bin/cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_CXX_COMPILER=$INSTALL_DIR/bin/mpic++ -DCMAKE_C_COMPILER=$INSTALL_DIR/bin/mpicc \
   -DCMAKE_Fortran_COMPILER=$INSTALL_DIR/bin/mpifort \
@@ -233,11 +219,7 @@ if [ "$NERSC_HOST" != "cori" ]; then #Not on a Cori node; use the locally built 
   -DPARMETIS_INCLUDES=$INSTALL_DIR/include -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.a \
   -DSCOTCH_INCLUDES=$INSTALL_DIR/include -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
 elif [[ $(getconf _NPROCESSORS_ONLN) -ne 272 ]]; then #If not 272 cores, then we are on a login or Haswell node; use local mpi and MKL ScaLAPACK. Following the STRUMPACK Github Installer code
-  echo "KNL installation"
-  pushd . > /dev/null;
-  cd STRUMPACK
-  mkdir build
-  cd build
+  echo "Default Cori login node/Haswell installation"
   cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
   -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
@@ -245,11 +227,7 @@ elif [[ $(getconf _NPROCESSORS_ONLN) -ne 272 ]]; then #If not 272 cores, then we
   -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.a -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
   -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
 else #Otherwise on a KNL node; Need to adjust so that the libraries used as KNL specific
-  echo "Default Cori installation"
-  pushd . > /dev/null;
-  cd STRUMPACK
-  mkdir build
-  cd build
+  echo "KNL installation"
   cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
    -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
    -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
