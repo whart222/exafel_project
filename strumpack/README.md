@@ -1,0 +1,5 @@
+The [STRUMPACK](http://portal.nersc.gov/project/sparse/strumpack/) library for solution of sparse and dense linear matrices can be built by running `chmod +x ./STRUMPACK_installer.sh; ./STRUMPACK_installer.sh`
+
+The script will create `deps`, `builds` and `downloads` directories. All required dependencies will first be downloaded into the `downloads` directory. Following this, they will then be unpacked into `deps`. Lastly, each dependency will be built, with the final installation going to the `builds` directory.
+
+If the script is run on the NERSC supercomputer Cori, the behaviour will be slightly different, as many of the dependendencies can be met with the system-installed packages. It is also worth noting that C++11 support is required for this package, and so a modern compiler will be needed. The default GCC compiler on Centos/RH/SL (GCC 4.4.x) will not generate a successful build. On Cori, this is dealt with by first running `module load gcc`, which loads a modern GCC onto the path.
