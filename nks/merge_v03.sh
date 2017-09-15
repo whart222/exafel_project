@@ -60,3 +60,11 @@ xray_data.r_free_flags.file_name=${trial}_001.mtz \
 xray_data.r_free_flags.label=R-free-flags \
 selection="element Yb" |tee ${trial}_peakht.log
 
+phenix.molprobity input.pdb.file_name=${trial}_001.pdb \
+molprobity.flags.clashscore=False molprobity.flags.ramalyze=False \
+molprobity.flags.omegalyze=False molprobity.flags.rotalyze=False molprobity.flags.cbetadev=False \
+molprobity.flags.nqh=False molprobity.flags.rna=False molprobity.flags.restraints=False \
+output.coot=False output.probe_dots=False output.prefix=${trial}_molprobity
+
+libtbx.python ${CONDA_ROOT}/modules/exafel_project/nks/json/to_json.py ${MERGE_ROOT} ${trial}
+
