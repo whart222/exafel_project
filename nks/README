@@ -56,11 +56,6 @@ ${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
 export MULTINODE=False
 ${CONDA_ROOT}/modules/exafel_project/nks/merge.sh
 
-Still to implement:
-1) Dependence of merge & xmerge on MySQL
-2) MPI parallelism for merge
-3) output the Table 1 + 2 json at the end of script.
-
 Version v02 of the script.  Use MySQL database backend for merging
 ------------------------------------------------------------------
 Install the Python database client:
@@ -79,8 +74,23 @@ ${CONDA_ROOT}/modules/exafel_project/nks/merge_v02.sh
 export MULTINODE=False
 ${CONDA_ROOT}/modules/exafel_project/nks/merge_v02.sh
 
-Version v03 of the script.  Use MPI parallelism
------------------------------------------------
+Results on cori.nersc.gov:
+
+Build   Computational_step  #nodes          architecture  package       DONE
+
+Shifter merge               MULTINODE=True   KNL          xfel only     6 minutes
+                            use 1 node
+                            260 cores/node
+
+Native  xmerge              MULTINODE=False  Haswell      phenix build  4  minutes
+        xtriage             nproc=32
+        phenix.refine
+        anomalous
+        molprobity
+        table 1 & 2
+
+Version v03 of the script.  MPI parallelism, one node only, no NERSC support
+----------------------------------------------------------------------------
 Works on standalone Linux box, not at NERSC, apparently the MPI
 spawn option is not available there (will fix later).
 
@@ -88,4 +98,9 @@ export MULTINODE=True
 ${CONDA_ROOT}/modules/exafel_project/nks/merge_v03.sh
 export MULTINODE=False
 ${CONDA_ROOT}/modules/exafel_project/nks/merge_v03.sh
+
+Still to implement:
+-------------------
+1) Version v04, MPI parallelism with NERSC support using Send & Recv
+
 
