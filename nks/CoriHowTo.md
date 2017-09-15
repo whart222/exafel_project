@@ -62,9 +62,10 @@ mv ./send_octet_stream.cgi\?version\=dev-2880\&file\=phenix-installer-dev-2880-s
 8. Untar the file, cd into the directory and build the binaries:
 ```bash
 cd phenix-installer-dev-2880-source
-cp modules/cctbx_project/libtbx/auto_build/bootstrap.py .
-python bootstrap.py build --builder=phenix --with-python=`which python` --nproc=<# cores available for compile> 
-# Note:  fatal error message after gui dispatcher step is of no consequence
+cp modules/cctbx_project/libtbx/auto_build/bootstrap.py .;
+cat ./bootstrap.py | sed -e '1515,1529d;' > bootstrap_2.py ; #Remove gui error
+mv bootstrap_2.py ./bootstrap.py;
+python bootstrap.py build --builder=phenix --with-python=`which python` --nproc=<cores available for compile> 
 ```
 
 Running the LD91, run 108 example
