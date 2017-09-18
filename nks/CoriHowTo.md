@@ -72,17 +72,21 @@ Running the LD91, run 108 example
 ---------------------------------
 A. We must now set environment variables for the database access, and creating the appropriate output from the merging steps:
 ```bash
-# a unique tag for this merging trial with a particular $TARDATA.
-export TAG=<any tag> 
+# Path for the top-level merging directory above several $TAG and $TARDATA pairs. All directories 
+# beneath MERGE_ROOT will be specific instances of merged data from TAR globs specified by TARDATA. 
+# The tags will be used to distinguish between different merged data sets 
+# (eg, step1 can be run95, step2 can be runs 95 and 96, etc.)
 
-# glob describing path to TAR files (run 108 in this case). 
+#Create data directory for storing all merged results, preferably somewhere on SCRATCH
+export MERGE_ROOT=$PWD/myMergedData
+
+# glob describing path to TAR files to be merged (run 108 in this case). 
 # This path is currently pointing to the GPFS filesystem, 
 # so copying to SCRATCH is recommended for optimal performance.
 export TARDATA=/global/project/projectdirs/lcls/mlxd/cxid9114/processing/batch_metrology_r0113_013/TAR_95-114/r0108*.tar 
 
-# Path for the top-level merging directory above several $TAG/$TARDATA pairs. 
-# Preferably somewhere on SCRATCH
-export MERGE_ROOT=<new directory name> 
+# a unique tag for this merging trial. 
+export TAG=step1
 
 # This file will set all the required database parameters.
 # A path to this will be provided if requested, as it will not be checked into the repository.
