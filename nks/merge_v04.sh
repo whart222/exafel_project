@@ -16,7 +16,7 @@ mysql.passwd=${MYSQL_PASSWD} \
 mysql.database=${MYSQL_DATABASE} \
 scaling.report_ML=True \
 pixel_size=0.11 \
-nproc=${1} \
+nproc=1 \
 postrefinement.enable=True \
 scaling.mtz_file=${MERGE_ROOT}/4ngz.mtz \
 scaling.mtz_column_F=f(+) \
@@ -26,7 +26,7 @@ output.prefix=${trial}"
 if [ ${MULTINODE} == "True" ]; then
   # source the cctbx build
   source ${CONDA_ROOT}/build/setpaths.sh
-  mpirun mpi.merge ${effective_params}
+  mpirun -n 60 mpi.cluster_merge ${effective_params}
   exit
 fi
 

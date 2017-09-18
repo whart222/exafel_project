@@ -99,8 +99,7 @@ ${CONDA_ROOT}/modules/exafel_project/nks/merge_v03.sh
 export MULTINODE=False
 ${CONDA_ROOT}/modules/exafel_project/nks/merge_v03.sh
 
-Still to implement:
--------------------
-1) Version v04, MPI parallelism with NERSC support using Send & Recv
-
+Version v04 of the script.  MPI parallelism, multiple nodes, should work at NERSC
+---------------------------------------------------------------------------------
+Uses merge_v04.sh
 
