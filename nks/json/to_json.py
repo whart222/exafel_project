@@ -85,7 +85,8 @@ class xmerge_interpreter(object):
     startNum = 0
     endNum = 0
     for lineNum, line in enumerate(self.xmerge):
-      if 'Bin  Resolution Range  Completeness   %    multi> multi> n_meas   <I>    <I/sig(I)>' in line:
+      if "".join('Bin  Resolution Range  Completeness   %    multi> multi> n_meas   <I>    <I/sig(I)>'.split()) \
+      in "".join(line.strip().split()):
           startNum = lineNum + 2
     for iline in xrange(startNum,len(self.xmerge)):
       if 'All' in self.xmerge[iline]:
