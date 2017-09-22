@@ -26,7 +26,7 @@ output.prefix=${trial}"
 if [ ${MULTINODE} == "True" ]; then
   # source the cctbx build
   source ${CONDA_ROOT}/build/setpaths.sh
-  mpirun -n 60 mpi.cluster2_merge ${effective_params}
+  mpirun -n 60 mpi.cluster_two_merge ${effective_params}
   exit
 fi
 
