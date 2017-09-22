@@ -102,3 +102,5 @@ ${CONDA_ROOT}/modules/exafel_project/nks/merge_v03.sh
 Version v04 of the script.  MPI parallelism, multiple nodes, should work at NERSC
 ---------------------------------------------------------------------------------
 Uses merge_v04.sh
+
+Verson v05.  MPI, no MYSQL, file-based database backend. Avoids any INSERT marshalling in the worker threads.
