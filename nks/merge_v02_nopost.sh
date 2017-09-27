@@ -1,10 +1,10 @@
 #!/bin/bash
 export trial=${TAG}
-if [ "$NERSC_HOST" != "cori" ]; then
+#if [ "$NERSC_HOST" != "cori" ]; then
   source ${CONDA_ROOT}/miniconda/bin/activate myEnv
   mkdir -p ${MERGE_ROOT}/${TAG}
   cd ${MERGE_ROOT}/${TAG}
-fi
+#fi
 
 export effective_params="d_min=2.0 \
 targlob=${TARDATA} \
