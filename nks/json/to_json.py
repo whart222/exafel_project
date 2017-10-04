@@ -30,18 +30,20 @@ class xmerge_interpreter(object):
     r_split = []
     cc_iso = []
     for i in range(startNum, endNum+1):
-      if self.xmerge[i] == '\n':
+      st = self.xmerge[i]
+      if st == '\n':
         continue
       elif 'All' in self.xmerge[i]:
-        overall_cc_int = float(self.xmerge[i].split()[2].strip("%"))
-        overall_r_split = float(self.xmerge[i].split()[7].strip("%"))
-        overall_cc_iso = float(self.xmerge[i].split()[4].strip("%"))
+        overall_cc_int = float(st.split()[2].strip("%"))
+        overall_r_split = float(st.split()[7].strip("%"))
+        overall_cc_iso = float(st.split()[4].strip("%"))
       else:
-        resolution_low.append("%.2f"%(float(self.xmerge[i].split()[1])))
-        resolution_high.append("%.2f"%(float(self.xmerge[i].split()[3])))
-        cc_int.append(float(self.xmerge[i].split()[5].strip("%")))
-        r_split.append(float(self.xmerge[i].split()[10].strip("%")))
-        cc_iso.append(float(self.xmerge[i].split()[7].strip("%")))
+        resolution_low.append("%.2f"%(float(st.split()[1])))
+        resolution_high.append("%.2f"%(float(st.split()[3])))
+	#Parsing after the ] due to potential whitespace issues with low data numbers  
+        cc_int.append(float(st.split("]")[1].split()[0].strip("%")))
+        r_split.append(float(st.split("]")[1].split()[5].strip("%")))
+        cc_iso.append(float(st.split("]")[1].split()[2].strip("%")))
 
     # Lowest resolution possibly set to infinity
     for ix in xrange(len(resolution_low)):
