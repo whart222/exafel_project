@@ -24,9 +24,11 @@ output.prefix=${trial}"
 source ${CONDA_ROOT}/build/setpaths.sh
 if [ ${MULTINODE} == "True" ]; then
   # source the cctbx build
-  mpi.cluster_two_merge ${effective_params}
   echo ${effective_params}
-  #libtbx.python /global/cscratch1/sd/mlxd/sept_sprint/merge_multi/ss/exafel_project/mlxd/multiglob/mpi_cluster_two_merge.py ${effective_params}
+  mpi.cluster_two_merge ${effective_params}
+
+  #To manually specify the merge file, use the following format
+  #libtbx.python my_merge.py ${effective_params}
   exit
 fi
 

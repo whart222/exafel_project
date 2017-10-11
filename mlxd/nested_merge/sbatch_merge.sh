@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=debug
-#SBATCH --job-name=merge_phase1
+#SBATCH --job-name=merge_phase1_<tag_template>
 #SBATCH --time=00:20:00
 #SBATCH --nodes=1
 #SBATCH --constraint=haswell
