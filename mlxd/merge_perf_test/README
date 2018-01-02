@@ -1,0 +1,6 @@
+This code allows to test the different algorithms for merging data using the new MPI versions of cxi.merge.
+To perform the testing, modify the parameters in the run_specific_merge.sh file to suit required testing
+parameters. To run the tests on dials/viper type:
+nohup ./run_specific_test.sh &
+The above shell script will execute in the background, calling do_specific_merge.sh and providing all the
+chosen parameters. Running tail on the logfile in the current directory will allow to check the progress.
