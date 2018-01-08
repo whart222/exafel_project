@@ -15,7 +15,7 @@ from xfel.merging.command_line.dev_cxi_merge_refltable import refltable_scaling_
 #from xfel.cxi.merging_utils import null_data
 
 class refltable_scaling_manager_mpi(scaling_manager_mpi, refltable_scaling_manager):
-
+  pass
 from xfel.merging.command_line.dev_cxi_merge import Script as base_Script
 
 class Script(base_Script):
