@@ -32,9 +32,10 @@ plt.clf()
 plt.scatter(start['t'] - t0, start['A'], marker='o', c='b')
 plt.scatter(start['t'] - t0, start['B'], marker='o', c='b')
 plt.scatter(end['t'] - t0, end['A'], marker='x', c='r')
-for ii in xrange( np.max([end['A'], end['B']])+1 ):
+for ii in xrange( len(start['A']) ):
     plt.plot( [ start['t'][ii] - t0, end['t'][ii] - t0] , [start['B'][ii], end['A'][ii]], c='k')
-    plt.axhline(ii, xmin=0, xmax=1)
+    if ii <= np.max([start['A'],start['B']]):
+    	plt.axhline(ii, xmin=0, xmax=1)
 plt.xlabel('time [t]')
 plt.ylabel('MPI rank')
 plt.title('%s_%s'%(str(sys.argv[1]), str(sys.argv[2])))

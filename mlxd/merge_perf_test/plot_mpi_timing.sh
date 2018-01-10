@@ -6,7 +6,7 @@ for ii in CORR_EXTEND DMIN_EXTEND REJFRAC_EXTEND WAVELENGTH_EXTEND UCVAL_ADDCELL
   cat $1 \
     | grep $ii \
     | tr ';' '\n' \
-    | grep START \
+    | grep ' START' \
     | awk '{ print $3,$4}' \
     | sed 's/RANK=//; s/:/,/; s/ TIME=/,/' \
     > ./REFL_REDUCE_CS_${ii}_START.csv
@@ -14,7 +14,7 @@ for ii in CORR_EXTEND DMIN_EXTEND REJFRAC_EXTEND WAVELENGTH_EXTEND UCVAL_ADDCELL
   cat $1 \
     | grep $ii \
     | tr ';' '\n' \
-    | grep END \
+    | grep ' END' \
     | awk '{ print $3,$4}' \
     | sed 's/RANK=//; s/:/,/; s/ TIME=/,/' \
     > ./REFL_REDUCE_CS_${ii}_END.csv
