@@ -4,6 +4,7 @@ for ii in CORR_EXTEND DMIN_EXTEND REJFRAC_EXTEND WAVELENGTH_EXTEND UCVAL_ADDCELL
   cat $1 \
     | grep $ii \
     | tr ';' '\n' \
+    | grep $ii \
     | grep ' START' \
     | awk '{ print $3,$4}' \
     | sed 's/RANK=//; s/:/,/; s/ TIME=/,/' \
@@ -12,10 +13,11 @@ for ii in CORR_EXTEND DMIN_EXTEND REJFRAC_EXTEND WAVELENGTH_EXTEND UCVAL_ADDCELL
   cat $1 \
     | grep $ii \
     | tr ';' '\n' \
+    | grep $ii \
     | grep ' END' \
     | awk '{ print $3,$4}' \
     | sed 's/RANK=//; s/:/,/; s/ TIME=/,/' \
     > ./REFL_REDUCE_CS_${ii}_END.csv
   #Pass the extracted data into the python script to generate the timing plot
-  libtbx.python plot_mpi_timing.py REFL_REDUCE_CS_${ii}_START.csv REFL_REDUCE_CS_${ii}_END.csv
+  python plot_mpi_timing.py REFL_REDUCE_CS_${ii}_START.csv REFL_REDUCE_CS_${ii}_END.csv
 done
