@@ -32,14 +32,17 @@ plt.savefig('3d_%s_%s.pdf'%(StartStr, EndStr))
 plt.clf()
 
 #2D connections diagram
-plt.scatter(start['t'] - t0, start['A'], marker='o', c='b')
-plt.scatter(start['t'] - t0, start['B'], marker='o', c='b')
-plt.scatter(end['t'] - t0, end['A'], marker='x', c='r')
 for ii in xrange( len(start['A']) ):
-    plt.plot( [ start['t'][ii] - t0, end['t'][ii] - t0] , [start['B'][ii], end['A'][ii]], c='k')
-    if ii <= np.max([start['A'],start['B']]):
-    	plt.axhline(ii, xmin=0, xmax=1)
-plt.xlabel('time [t]')
+  plt.plot( [ start['t'][ii] - t0, end['t'][ii] - t0] , [start['B'][ii], end['A'][ii]], linestyle='-', linewidth=0.5, c='k', alpha=0.8)
+  if ii <= np.max([start['A'],start['B']]):
+    plt.axhline(ii, xmin=0, xmax=1, linewidth=0.5)
+
+plt.scatter(start['t'] - t0, start['B'], marker='x', c='r', alpha=0.8)
+plt.scatter(end['t'] - t0, end['A'], marker='o', c='b', alpha=0.8)
+
+plt.xlabel('time [s]')
 plt.ylabel('MPI rank')
 plt.title('%s_%s'%(StartStr, EndStr))
+plt.xlim([ 0, np.max(end['t']) - t0 ])
+plt.ylim([ np.min([end['A'], end['B']]), np.max([end['A'],end['B']]) ])
 plt.savefig('2d_%s_%s.pdf'%(StartStr, EndStr))
