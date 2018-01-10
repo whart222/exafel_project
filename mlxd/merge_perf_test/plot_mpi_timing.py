@@ -23,7 +23,7 @@ for a in ds[0].keys():
 ax.set_zlim3d([0,np.max(end['t']) - np.min(start['t'])])
 ax.set_ylim3d([0,60])
 ax.set_xlim3d([0,60])
-plt.savefig('%s_%s.pdf'%(str(sys.argv[1]),str(sys.argv[2])))
+plt.savefig('3d_%s_%s.pdf'%(str(sys.argv[1]),str(sys.argv[2])))
 plt.clf()
 
 #2D connections diagram
@@ -37,4 +37,4 @@ for ii in xrange(len(end['A'])):
 plt.xlabel('time [t]')
 plt.ylabel('MPI rank')
 plt.title('%s_%s'%(str(sys.argv[1]),str(sys.argv[2])))
-plt.savefig('%s_%s.pdf'%(str(sys.argv[1]),str(sys.argv[2])))
+plt.savefig('2d_%s_%s.pdf'%(str(sys.argv[1]),str(sys.argv[2])))
