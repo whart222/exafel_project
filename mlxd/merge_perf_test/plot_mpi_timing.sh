@@ -1,6 +1,8 @@
 #!/bin/bash
 for ii in CORR_EXTEND DMIN_EXTEND REJFRAC_EXTEND WAVELENGTH_EXTEND UCVAL_ADDCELLS DICT_MERGE ISIGI_CID ISIGI_EXTEND CTABLE_EXTEND SEQ_ADD OBS_EXTEND; do
   #Extract the start timing data for the above strings
+  python plot_mpi_timing.py REFL_REDUCE_CS_${ii}_START.csv REFL_REDUCE_CS_${ii}_END.csv
+  continue
   cat $1 \
     | grep $ii \
     | tr ';' '\n' \
