@@ -18,7 +18,7 @@ t0 = np.min(start['t'])
 fig = plt.figure()
 fig.clf()
 ax = fig.add_subplot(111, projection='3d')
-ax.set_zlabel('time [t]')
+ax.set_zlabel('time [s]')
 ax.set_ylabel('Rank To Merge')
 ax.set_xlabel('Rank Base')
 for a in ds[0].keys():
@@ -32,13 +32,16 @@ plt.savefig('3d_%s_%s.pdf'%(StartStr, EndStr))
 plt.clf()
 
 #2D connections diagram
-for ii in xrange( len(start['A']) ):
-  plt.plot( [ start['t'][ii] - t0, end['t'][ii] - t0] , [start['B'][ii], end['A'][ii]], linestyle='-', linewidth=0.5, c='k', alpha=0.8)
-  if ii <= np.max([start['A'],start['B']]):
-    plt.axhline(ii, xmin=0, xmax=1, linewidth=0.5)
+#Draw lines to mark the MPI ranks
+for ii in xrange(np.max([start['A'],start['B']])):
+  plt.axhline(ii, xmin=0, xmax=1, linewidth=0.5)
 
-plt.scatter(start['t'] - t0, start['B'], marker='x', c='r', alpha=0.8)
-plt.scatter(end['t'] - t0, end['A'], marker='o', c='b', alpha=0.8)
+#Draw lines between the start and end for reducing 2 data sets
+for a in ds[0].keys():
+  
+  plt.plot( [ ds[0][a][2] - t0, de[0][a][2] - t0] , [ds[0][a][1], de[0][a][0]], linestyle='-', linewidth=0.5, c='k', alpha=0.8)
+  plt.scatter( start['t'] - t0, start['B'], marker='x', c='r', alpha=0.8)
+  plt.scatter( end['t'] - t0, end['A'], marker='o', c='b', alpha=0.8)
 
 plt.xlabel('time [s]')
 plt.ylabel('MPI rank')
