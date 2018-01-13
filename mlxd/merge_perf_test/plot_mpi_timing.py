@@ -2,6 +2,7 @@ import sys
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
+import matplotlib.markers as mkr
 
 StartStr = str(sys.argv[1])
 EndStr = str(sys.argv[2])
