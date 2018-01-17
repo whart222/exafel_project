@@ -11,7 +11,7 @@ LAPACK=http://www.netlib.org/lapack/lapack-3.7.1.tgz
 SCALAPACK=http://www.netlib.org/scalapack/scalapack_installer.tgz
 OPENBLAS=http://github.com/xianyi/OpenBLAS/archive/v0.2.20.tar.gz
 CMAKE=https://cmake.org/files/v3.9/
-OPENMPI=https://www.open-mpi.org/software/ompi/v2.1/downloads/openmpi-2.1.1.tar.gz
+OPENMPI=https://www.open-mpi.org/software/ompi/v3.0/downloads/openmpi-3.0.0.tar.gz
 
 # Create directory structure
 if [ ! -d ./downloads ]; then
@@ -29,7 +29,8 @@ cd downloads
 
 # Setup NERSC environment for building
 if [ "$NERSC_HOST" == "cori" ]; then
-  module load gcc
+  module swap PrgEnv-intel PrgEnv-gnu
+  module swap gcc/7.1.0 gcc/4.9.3
   #module load python/2.7-anaconda
   #source activate ${1} ##Pass conda env name as argument
 fi
@@ -47,6 +48,15 @@ else
   git pull --rebase
   popd > /dev/null
 fi
+
+#Download OpenMPI
+if [ ! -e OPENMPI.tar.gz ]; then
+  echo "Downloading OPENMPI"
+  curl -L $OPENMPI -o OPENMPI.tar.gz
+  mkdir ../deps/OPENMPI
+  tar xvf OPENMPI.tar.gz -C ../deps/OPENMPI --strip-components 1 
+fi
+
 
 # METIS v5.1.0 nested dissection
 if [ ! -e METIS.tar.gz ]; then
@@ -106,7 +116,7 @@ if [ ! -e CMAKE.tar.gz ]; then
     export CMAKE_DIR=$PWD/../deps/cmake-3.9.1-Darwin-x86_64/CMake.app/Contents/
   fi
   tar xvf CMAKE.tar.gz -C ../deps
-  cp -R $CMAKE_DIR/* ../builds
+  cp -Rv $CMAKE_DIR/* ../builds
 fi
 
 # SCALAPACK
@@ -139,14 +149,14 @@ if [ "$NERSC_HOST" == "cori" ]; then
 fi
 
 #Get core count/2
-let proc=$(getconf _NPROCESSORS_ONLN)/4
+let proc=$(getconf _NPROCESSORS_ONLN)/2
 cd deps
 
 # Build all dependencies and dependency dependencies
 
 #OPENMPI: Optional if to be included from modules/conda
 if [ "$NERSC_HOST" != "cori" ]; then
-  cd ./openmpi-2.1.1
+  cd ./OPENMPI
   ./configure --prefix=$INSTALL_DIR --enable-mpi-thread-multiple
   make -j$(echo ${proc}) && make install
   cd ..
@@ -220,7 +230,7 @@ if [ "$NERSC_HOST" != "cori" ]; then #Not on a Cori node; use the locally built 
   -DSCOTCH_INCLUDES=$INSTALL_DIR/include -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
 elif [[ $(getconf _NPROCESSORS_ONLN) -ne 272 ]]; then #If not 272 cores, then we are on a login or Haswell node; use local mpi and MKL ScaLAPACK. Following the STRUMPACK Github Installer code
   echo "Default Cori login node/Haswell installation"
-  cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+  cmake ../ -D_GLIBCXX_USE_CXX11_ABI=0 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
   -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
   -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.a -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
@@ -228,12 +238,12 @@ elif [[ $(getconf _NPROCESSORS_ONLN) -ne 272 ]]; then #If not 272 cores, then we
   -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
 else #Otherwise on a KNL node; Need to adjust so that the libraries used as KNL specific
   echo "KNL installation"
-  cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+  cmake ../ -D_GLIBCXX_USE_CXX11_ABI=0 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
    -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
    -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
    -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.a -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
    -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.a -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
    -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
 fi
-make -j$(echo ${proc}) && make install
+make -j ${proc} && make install
 popd > /dev/null
