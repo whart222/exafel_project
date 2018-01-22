@@ -11,11 +11,27 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/global/cscratch1/sd/mlxd/feb_sprint/mod
 ```
 - Compile the Boost.Python extension module against a pre-existing xfel build of cctbx
 ```bash
-g++ -c -fPIC ./strumpack_solver_ext.cc -I/global/cscratch1/sd/mlxd/feb_sprint/modules/strumpack/builds/include/ -I$(cc --cray-print-opts=cflags) -std=c++11 -D_GLIBCXX_USE_CXX11_ABI=0 -DBOOST_PYTHON_MAX_BASES=2 -I/global/cscratch1/sd/mlxd/feb_sprint/modules/boost -I/global/cscratch1/sd/mlxd/feb_sprint/modules/boost -fPIC -fno-strict-aliasing -D_GLIBCXX_USE_CXX11_ABI=0 -Wall -Wno-sign-compare -Wno-unknown-pragmas -Wno-parentheses -Winit-self -Wno-unused-local-typedefs -Werror=vla -DNDEBUG -O3 -funroll-loops -ffast-math -DBOOST_ALL_NO_LIB -I/global/cscratch1/sd/mlxd/feb_sprint/build/include -I/global/cscratch1/sd/mlxd/feb_sprint/modules/cctbx_project -I/global/cscratch1/sd/mlxd/merge_perf/miniconda/envs/strumpack/include/python2.7 -I/global/cscratch1/sd/mlxd/feb_sprint/modules -I/global/cscratch1/sd/mlxd/feb_sprint/modules/cctbx_project -o strumpack_solver_ext.o
+g++ -c -fPIC ./strumpack_solver_ext.cc \
+-I/global/cscratch1/sd/mlxd/feb_sprint/modules/strumpack/builds/include/ \
+-I$(cc --cray-print-opts=cflags) -std=c++11 -D_GLIBCXX_USE_CXX11_ABI=0 \
+-DBOOST_PYTHON_MAX_BASES=2 -I/global/cscratch1/sd/mlxd/feb_sprint/modules/boost \
+-I/global/cscratch1/sd/mlxd/feb_sprint/modules/boost -fPIC -fno-strict-aliasing \
+-Wall -Wno-sign-compare -Wno-unknown-pragmas -Wno-parentheses -Winit-self \
+-Wno-unused-local-typedefs -Werror=vla -DNDEBUG -O3 -funroll-loops \
+-ffast-math -DBOOST_ALL_NO_LIB -I/global/cscratch1/sd/mlxd/feb_sprint/build/include \
+-I/global/cscratch1/sd/mlxd/feb_sprint/modules/cctbx_project \
+-I/global/cscratch1/sd/mlxd/merge_perf/miniconda/envs/strumpack/include/python2.7 \
+-I/global/cscratch1/sd/mlxd/feb_sprint/modules \
+-I/global/cscratch1/sd/mlxd/feb_sprint/modules/cctbx_project \
+-o strumpack_solver_ext.o
 ```
 - Link the libraries and produce `strumpack_solver.so`, which can now be loaded into python:
 ```bash
-g++ -o strumpack_solver.so -shared -s strumpack_solver_ext.o -Llib -L/global/cscratch1/sd/mlxd/feb_sprint/modules/strumpack/builds/lib/  -L/global/cscratch1/sd/mlxd/feb_sprint/build/lib -L/global/cscratch1/sd/mlxd/feb_sprint/modules/cctbx_project/lib -lboost_python -lm -lscitbx_boost_python -lboost_python -lcctbx -lstrumpack
+g++ -o strumpack_solver.so -shared -s strumpack_solver_ext.o -Llib \
+-L/global/cscratch1/sd/mlxd/feb_sprint/modules/strumpack/builds/lib/  \
+-L/global/cscratch1/sd/mlxd/feb_sprint/build/lib \
+-L/global/cscratch1/sd/mlxd/feb_sprint/modules/cctbx_project/lib \
+-lboost_python -lm -lscitbx_boost_python -lboost_python -lcctbx -lstrumpack
 ```
 
 ```python
