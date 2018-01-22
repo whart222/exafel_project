@@ -1,0 +1,18 @@
+Import('env')
+Import('env_etc')
+
+sources = [
+    'boost_python/strumpack_solver_ext.cc',
+]
+
+strumpack_libs = ["-lstrumpack"]
+strumpack_libPath = ["-L/global/cscratch1/sd/mlxd/feb_sprint/modules/strumpack/builds/lib/"]
+strumpack_libs.extend(env["LIBS"])
+
+env.SharedLibrary(
+  target='#/lib/strumpack_solver_ext',
+  source=sources,
+  LIBS=strumpack_libs,
+  LIBPATH=strumpack_libPath,
+  )
+
