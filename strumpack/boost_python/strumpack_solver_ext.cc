@@ -21,6 +21,7 @@
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
  *             (Lawrence Berkeley National Lab, Computational Research Division).
  *
+ * Modified by Lee J. O'Riordan to adapt for use with Boost.Python
  */
 #include <iostream>
 #include "StrumpackSparseSolver.hpp"
