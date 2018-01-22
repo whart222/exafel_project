@@ -7,7 +7,7 @@ PARMETIS=http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.g
 SCOTCH=https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
 TCMALLOC=https://github.com/gperftools/gperftools/releases/download/gperftools-2.6.1/gperftools-2.6.1.tar.gz
 
-LAPACK=http://www.netlib.org/lapack/lapack-3.7.1.tgz
+LAPACK=http://www.netlib.org/lapack/lapack-3.8.0.tar.gz
 SCALAPACK=http://www.netlib.org/scalapack/scalapack_installer.tgz
 OPENBLAS=http://github.com/xianyi/OpenBLAS/archive/v0.2.20.tar.gz
 CMAKE=https://cmake.org/files/v3.9/
