@@ -30,7 +30,7 @@ cd downloads
 # Setup NERSC environment for building
 if [ "$NERSC_HOST" == "cori" ]; then
   module swap PrgEnv-intel PrgEnv-gnu
-  module swap gcc/7.1.0 gcc/4.9.3
+  module load gcc/4.9.3
   #module load python/2.7-anaconda
   #source activate ${1} ##Pass conda env name as argument
 fi
