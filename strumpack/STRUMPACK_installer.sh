@@ -52,7 +52,7 @@ fi
 #Download OpenMPI
 if [ ! -e OPENMPI.tar.gz ] && [ "$NERSC_HOST" != "cori" ]; then
   echo "Downloading OPENMPI"
-  curl -L $OPENMPI -o OPENMPI.tar.gz
+  wget $OPENMPI -O OPENMPI.tar.gz
   mkdir ../strumpack_deps/OPENMPI
   tar xvf OPENMPI.tar.gz -C ../strumpack_deps/OPENMPI --strip-components 1 
 fi
@@ -189,8 +189,8 @@ cd ..
 cd ./scotch_6.0.4/src
 cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 ./Makefile.inc
 sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
-sed -i.bak 's/-DSCOTCH_PTHREAD//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
-sed -i.bak 's/-pthread//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
+#sed -i.bak 's/-DSCOTCH_PTHREAD//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
+#sed -i.bak 's/-pthread//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
 if [ "$NERSC_HOST" == "cori" ]; then
   sed -i.bak 's/gcc/cc/' ./Makefile.inc #Change default compiler
   sed -i.bak 's/mpicc/cc/' ./Makefile.inc #Change default compiler for mpi
@@ -202,7 +202,7 @@ cd ../..
 # Install OpenBLAS; MKL might be a good option too
 if [ "$NERSC_HOST" != "cori" ]; then
   cd ./OpenBLAS-0.2.20
-  make -j$(echo ${proc}) && make PREFIX=$INSTALL_DIR install
+  USE_OPENMP=1 make -j$(echo ${proc}) && make PREFIX=$INSTALL_DIR install
   cd ..
 fi
 
