@@ -1,8 +1,3 @@
-The [STRUMPACK](http://portal.nersc.gov/project/sparse/strumpack/) library for solution of sparse and dense linear matrices can be built by running `chmod +x ./STRUMPACK_installer.sh; ./STRUMPACK_installer.sh`
+The [STRUMPACK](http://portal.nersc.gov/project/sparse/strumpack/) library for solution of sparse and dense linear matrices can be built by running `STRUMPACK_build_deps.sh` followed by `STRUMPACK_build_shared.sh`. This is currently the preferred method for building the library, and will be used unless expressed otherwise. The dependencies will first be downloaded and built, after which `libstrumpack.so` will be built against these dependencies.
 
-The script will create `deps`, `builds` and `downloads` directories. All required dependencies will first be downloaded into the `downloads` directory. Following this, they will then be unpacked into `deps`. Lastly, each dependency will be built, with the final installation going to the `builds` directory.
-
-If the script is run on the NERSC supercomputer Cori, the behaviour will be slightly different, as many of the dependencies can be met with the system-installed packages. It is also worth noting that C++11 support is required for this package, and so a modern compiler will be needed. The default GCC compiler on Centos/RH/SL (GCC 4.4.x) will not generate a successful build. On Cori, this is dealt with by first running `module load gcc`, which loads a modern GCC onto the path. This is required even when using the Intel/Cray compilers, as they depend upon the version of GCC headers on the path.
-
-
-The instllation process can also build dependencies separately from the STRUMPACK library, by using `STRUMPACK_build_deps.sh`  followed by `STRUMPACK_build_shared.sh`. 
+The scripts will create `strumpack_deps`, `strumpack_build` and `strumpack_downloads` directories. All required dependencies will first be downloaded into the `downloads` directory. Following this, they will then be unpacked into `deps`. Lastly, each dependency will be built, with the final installation going to the `builds` directory.
