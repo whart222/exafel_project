@@ -7,30 +7,30 @@ PARMETIS=http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.g
 SCOTCH=https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
 TCMALLOC=https://github.com/gperftools/gperftools/releases/download/gperftools-2.6.1/gperftools-2.6.1.tar.gz
 
-LAPACK=http://www.netlib.org/lapack/lapack-3.7.1.tgz
+LAPACK=http://www.netlib.org/lapack/lapack-3.8.0.tar.gz
 SCALAPACK=http://www.netlib.org/scalapack/scalapack_installer.tgz
 OPENBLAS=http://github.com/xianyi/OpenBLAS/archive/v0.2.20.tar.gz
 CMAKE=https://cmake.org/files/v3.9/
 OPENMPI=https://www.open-mpi.org/software/ompi/v3.0/downloads/openmpi-3.0.0.tar.gz
 
 # Create directory structure
-if [ ! -d ./downloads ]; then
-  mkdir downloads
+if [ ! -d ./strumpack_downloads ]; then
+  mkdir strumpack_downloads
 fi
-if [ ! -d ./deps ]; then
-  mkdir deps
+if [ ! -d ./strumpack_deps ]; then
+  mkdir strumpack_deps
 fi
-if [ ! -d ./builds ]; then
-  mkdir builds
+if [ ! -d ./strumpack_build ]; then
+  mkdir strumpack_build
 fi
 
 pushd . >/dev/null
-cd downloads
+cd strumpack_downloads
 
 # Setup NERSC environment for building
 if [ "$NERSC_HOST" == "cori" ]; then
   module swap PrgEnv-intel PrgEnv-gnu
-  module load gcc/4.9.3
+  module swap gcc gcc/4.9.3
   #module load python/2.7-anaconda
   #source activate ${1} ##Pass conda env name as argument
 fi
@@ -38,23 +38,23 @@ fi
 #################################################
 # Acquire STRUMPACK-sparse and all dependencies #
 #################################################
-if [ ! -d ../deps/STRUMPACK ]; then
+if [ ! -d ../strumpack_deps/STRUMPACK ]; then
   echo "Downloading STRUMPACK"
   git clone $STRUMPACK
-  cp -Rf STRUMPACK ../deps
+  cp -Rf STRUMPACK ../strumpack_deps
 else
   pushd . > /dev/null
-  cd ../deps/STRUMPACK;
+  cd ../strumpack_deps/STRUMPACK;
   git pull --rebase
   popd > /dev/null
 fi
 
 #Download OpenMPI
-if [ ! -e OPENMPI.tar.gz ]; then
+if [ ! -e OPENMPI.tar.gz ] && [ "$NERSC_HOST" != "cori" ]; then
   echo "Downloading OPENMPI"
   curl -L $OPENMPI -o OPENMPI.tar.gz
-  mkdir ../deps/OPENMPI
-  tar xvf OPENMPI.tar.gz -C ../deps/OPENMPI --strip-components 1 
+  mkdir ../strumpack_deps/OPENMPI
+  tar xvf OPENMPI.tar.gz -C ../strumpack_deps/OPENMPI --strip-components 1 
 fi
 
 
@@ -62,11 +62,11 @@ fi
 if [ ! -e METIS.tar.gz ]; then
   echo "Downloading METIS"
   curl -L $METIS -o METIS.tar.gz
-  tar xvf METIS.tar.gz -C ../deps
+  tar xvf METIS.tar.gz -C ../strumpack_deps
   #Update library to 64 bit width
   if [ $(getconf LONG_BIT) == "64" ]; then
-    sed -i.bak 's/IDXTYPEWIDTH 32/IDXTYPEWIDTH 64/g' ../deps/metis-5.1.0/include/metis.h;
-    rm ../deps/metis-5.1.0/include/metis.h.bak
+    sed -i.bak 's/IDXTYPEWIDTH 32/IDXTYPEWIDTH 64/g' ../strumpack_deps/metis-5.1.0/include/metis.h;
+    rm ../strumpack_deps/metis-5.1.0/include/metis.h.bak
   fi
 fi
 
@@ -74,11 +74,11 @@ fi
 if [ ! -e PARMETIS.tar.gz ]; then
   echo "Downloading PARMETIS"
   curl -L $PARMETIS -o PARMETIS.tar.gz
-  tar xvf PARMETIS.tar.gz -C ../deps
+  tar xvf PARMETIS.tar.gz -C ../strumpack_deps
     #Update library to 64 bit width
   if [ $(getconf LONG_BIT) == "64" ]; then
-    sed -i.bak 's/IDXTYPEWIDTH 32/IDXTYPEWIDTH 64/g' ../deps/parmetis-4.0.3/metis/include/metis.h;
-    rm ../deps/parmetis-4.0.3/metis/include/metis.h.bak
+    sed -i.bak 's/IDXTYPEWIDTH 32/IDXTYPEWIDTH 64/g' ../strumpack_deps/parmetis-4.0.3/metis/include/metis.h;
+    rm ../strumpack_deps/parmetis-4.0.3/metis/include/metis.h.bak
   fi
 fi
 
@@ -86,7 +86,7 @@ fi
 if [ ! -e SCOTCH.tar.gz ]; then
   echo "Downloading SCOTCH"
   curl -L $SCOTCH -o SCOTCH.tar.gz
-  tar xvf SCOTCH.tar.gz -C ../deps
+  tar xvf SCOTCH.tar.gz -C ../strumpack_deps
 fi
 
 # TCMALLOC: Faster malloc/new; Can potentially also use tbbmalloc 
@@ -95,14 +95,14 @@ fi
 if [ ! -e TCMALLOC.tar.gz ]; then
   echo "Downloading TCMALLOC"
   curl -L $TCMALLOC -o TCMALLOC.tar.gz
-  tar xvf TCMALLOC.tar.gz -C ../deps
+  tar xvf TCMALLOC.tar.gz -C ../strumpack_deps
 fi
 
 # OPENBLAS: Open source BLAS library
 if [ ! -e OPENBLAS.tar.gz ]; then
   echo "Downloading OPENBLAS"
   curl -L $OPENBLAS -o OPENBLAS.tar.gz
-  tar xvf OPENBLAS.tar.gz -C ../deps
+  tar xvf OPENBLAS.tar.gz -C ../strumpack_deps
 fi
 
 # CMAKE
@@ -110,33 +110,33 @@ if [ ! -e CMAKE.tar.gz ]; then
   echo "Downloading CMAKE"
   if [[ "$OSTYPE" == "linux"* ]]; then
     curl -L $CMAKE/cmake-3.9.1-Linux-x86_64.tar.gz -o CMAKE.tar.gz
-    export CMAKE_DIR=$PWD/../deps/cmake-3.9.1-Linux-x86_64/
+    export CMAKE_DIR=$PWD/../strumpack_deps/cmake-3.9.1-Linux-x86_64/
   elif [[ "$OSTYPE" == "darwin"* ]];then 
     curl -L $CMAKE/cmake-3.9.1-Darwin-x86_64.tar.gz -o CMAKE.tar.gz
-    export CMAKE_DIR=$PWD/../deps/cmake-3.9.1-Darwin-x86_64/CMake.app/Contents/
+    export CMAKE_DIR=$PWD/../strumpack_deps/cmake-3.9.1-Darwin-x86_64/CMake.app/Contents/
   fi
-  tar xvf CMAKE.tar.gz -C ../deps
-  cp -Rv $CMAKE_DIR/* ../builds
+  tar xvf CMAKE.tar.gz -C ../strumpack_deps
+  cp -Rv $CMAKE_DIR/* ../strumpack_build
 fi
 
 # SCALAPACK
 if [ ! -e SCALAPACK.tar.gz ]; then
   echo "Downloading SCALAPACK"
   curl -L $SCALAPACK -o SCALAPACK.tar.gz
-  tar xvf SCALAPACK.tar.gz -C ../deps
+  tar xvf SCALAPACK.tar.gz -C ../strumpack_deps
 fi
 
 popd > /dev/null
 pushd . > /dev/null;
 
 # Set the local bin directory on path for cmake, etc, as well as include paths
-export INSTALL_DIR=$PWD/builds
+export INSTALL_DIR=$PWD/strumpack_build
 export prefix=$INSTALL_DIR
-export PATH=$PATH:$PWD/builds/bin
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/builds/lib:$PWD/builds/lib64
+export PATH=$PATH:$PWD/strumpack_build/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/strumpack_build/lib:$PWD/strumpack_build/lib64
 
-LIB_DIR="-L$PWD/builds/lib -L$PWD/builds/lib64 -L$CONDA_PREFIX/lib "
-INC_DIR="-I$PWD/builds/include -I$CONDA_PREFIX/include "
+LIB_DIR="-L$PWD/strumpack_build/lib -L$PWD/strumpack_build/lib64 -L$CONDA_PREFIX/lib "
+INC_DIR="-I$PWD/strumpack_build/include -I$CONDA_PREFIX/include "
 
 #Append Cray include and libs to build flags where necessary
 if [ "$NERSC_HOST" == "cori" ]; then
@@ -150,7 +150,7 @@ fi
 
 #Get core count/2
 let proc=$(getconf _NPROCESSORS_ONLN)/2
-cd deps
+cd strumpack_deps
 
 # Build all dependencies and dependency dependencies
 
@@ -196,7 +196,7 @@ if [ "$NERSC_HOST" == "cori" ]; then
   sed -i.bak 's/mpicc/cc/' ./Makefile.inc #Change default compiler for mpi
 fi
 rm ./Makefile.inc.bak
-make scotch -j$(echo ${proc}) && make ptscotch -j$(echo ${proc}) && make install
+make scotch -j$(echo ${proc}) && make ptscotch -j$(echo ${proc}) && make prefix=${INSTALL_DIR} install
 cd ../..
 
 # Install OpenBLAS; MKL might be a good option too
