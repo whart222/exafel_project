@@ -50,7 +50,7 @@ else
 fi
 
 #Download OpenMPI
-if [ ! -e OPENMPI.tar.gz ] && [ "$NERSC_HOST" != "cori" ]; then
+if [ ! -e OPENMPI.tar.gz ]; then
   echo "Downloading OPENMPI"
   curl -L $OPENMPI -o OPENMPI.tar.gz
   mkdir ../strumpack_deps/OPENMPI
@@ -155,31 +155,29 @@ cd strumpack_deps
 # Build all dependencies and dependency dependencies
 
 #OPENMPI: Optional if to be included from modules/conda
-if [ "$NERSC_HOST" != "cori" ]; then
-  cd ./OPENMPI
-  ./configure --prefix=$INSTALL_DIR --enable-mpi-thread-multiple
-  make -j$(echo ${proc}) && make install
-  cd ..
-else
-  alias mpicc='cc'
-  alias mpicxx='CC'
-fi
+cd ./OPENMPI
+./configure --prefix=$INSTALL_DIR --enable-static --disable-shared --with-verbs=no CFLAGS='-fPIC -m64' CXXFLAGS='-fPIC -m64' FCFLAGS='-fPIC -m64' --disable-oshmem #Needed to build on Cray systems
+make -j$(echo ${proc}) && make install
+cd ..
 
 cd ./metis-5.1.0;
+#Modify the shared flag to emit position independent code only. Shared library not required, but fPIC static lib is necessary.
+sed -i.bak 's/-DSHARED=1/-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true/' ./Makefile
 if [ "$NERSC_HOST" != "cori" ]; then
-  make config cc=mpicc prefix=$INSTALL_DIR
+  make config cc=mpicc shared=1 prefix=$INSTALL_DIR
 else
-  make config cc=cc prefix=$INSTALL_DIR
+  make config cc=cc shared=1 prefix=$INSTALL_DIR
 fi
 make -j$(echo ${proc}) && make install
 cd ..
 
 #Needs to have mpicc on the path; can install using conda install openmpi on Mac, or mpich/openmpi on linux
 cd ./parmetis-4.0.3
+sed -i.bak 's/-DSHARED=1/-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true/' ./Makefile
 if [ "$NERSC_HOST" != "cori" ]; then
-  make config cc=mpicc prefix=$INSTALL_DIR
+  make config cc=mpicc shared=1 prefix=$INSTALL_DIR
 else
-  make config cc=cc cxx=CC prefix=$INSTALL_DIR
+  make config cc=cc shared=1 cxx=CC prefix=$INSTALL_DIR
 fi
 make -j$(echo ${proc}) && make install
 cd ..
@@ -188,7 +186,7 @@ cd ..
 # Expects mpi.h to be in /usr/include; not ideal;
 cd ./scotch_6.0.4/src
 cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 ./Makefile.inc
-sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
+sed -i.bak 's@-O3@'"-O3 -fPIC $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
 sed -i.bak 's/-DSCOTCH_PTHREAD//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
 sed -i.bak 's/-pthread//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
 if [ "$NERSC_HOST" == "cori" ]; then
@@ -200,18 +198,18 @@ make scotch -j$(echo ${proc}) && make ptscotch -j$(echo ${proc}) && make prefix=
 cd ../..
 
 # Install OpenBLAS; MKL might be a good option too
-if [ "$NERSC_HOST" != "cori" ]; then
+#if [ "$NERSC_HOST" != "cori" ]; then
   cd ./OpenBLAS-0.2.20
-  make -j$(echo ${proc}) && make PREFIX=$INSTALL_DIR install
+  make -j$(echo ${proc}) FC='ftn -fPIC' CC='cc -fPIC' NO_SHARED=1 && make PREFIX=$INSTALL_DIR install
   cd ..
-fi
+#fi
 
-if [ "$NERSC_HOST" != "cori" ]; then
+#if [ "$NERSC_HOST" != "cori" ]; then
   cd scalapack_installer
-  python ./setup.py --downall --mpibindir=$INSTALL_DIR/bin --prefix=$INSTALL_DIR
+  python ./setup.py --downall --ccflags='-O3 -fPIC' --mpibindir=$INSTALL_DIR/bin --prefix=$INSTALL_DIR
   make -j$(echo ${proc}) && make install
   cd ..
-fi
+#fi
 
 # STRUMPACK build
 # Parameterise for Cori login/Haswell, KNL, or non-Cori linux system
@@ -230,7 +228,7 @@ if [ "$NERSC_HOST" != "cori" ]; then #Not on a Cori node; use the locally built 
   -DSCOTCH_INCLUDES=$INSTALL_DIR/include -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
 elif [[ $(getconf _NPROCESSORS_ONLN) -ne 272 ]]; then #If not 272 cores, then we are on a login or Haswell node; use local mpi and MKL ScaLAPACK. Following the STRUMPACK Github Installer code
   echo "Default Cori login node/Haswell installation"
-  cmake ../ -D_GLIBCXX_USE_CXX11_ABI=0 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+  cmake ../ -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true -D_GLIBCXX_USE_CXX11_ABI=0 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
   -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
   -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.a -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
