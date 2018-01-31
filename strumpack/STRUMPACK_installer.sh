@@ -132,8 +132,8 @@ pushd . > /dev/null;
 # Set the local bin directory on path for cmake, etc, as well as include paths
 export INSTALL_DIR=$PWD/strumpack_build
 export prefix=$INSTALL_DIR
-export PATH=$PATH:$PWD/strumpack_build/bin
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/strumpack_build/lib:$PWD/strumpack_build/lib64
+export PATH=$PWD/strumpack_build/bin:$PATH
+export LD_LIBRARY_PATH=$PWD/strumpack_build/lib:$PWD/strumpack_build/lib64:$LD_LIBRARY_PATH
 
 LIB_DIR="-L$PWD/strumpack_build/lib -L$PWD/strumpack_build/lib64 -L$CONDA_PREFIX/lib "
 INC_DIR="-I$PWD/strumpack_build/include -I$CONDA_PREFIX/include "
@@ -187,8 +187,7 @@ cd ..
 cd ./scotch_6.0.4/src
 cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 ./Makefile.inc
 sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
-#sed -i.bak 's/-DSCOTCH_PTHREAD//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
-#sed -i.bak 's/-pthread//' ./Makefile.inc #Disable scotch pthreads as causes issues with MPI
+sed -i.bak 's@mpicc@'"${INSTALL_DIR}/bin/mpicc"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
 if [ "$NERSC_HOST" == "cori" ]; then
   sed -i.bak 's/gcc/cc/' ./Makefile.inc #Change default compiler
   sed -i.bak 's/mpicc/cc/' ./Makefile.inc #Change default compiler for mpi
@@ -198,18 +197,16 @@ make scotch -j$(echo ${proc}) && make ptscotch -j$(echo ${proc}) && make prefix=
 cd ../..
 
 # Install OpenBLAS; MKL might be a good option too
-#if [ "$NERSC_HOST" != "cori" ]; then
-  cd ./OpenBLAS-0.2.20
-  make -j$(echo ${proc}) FC='ftn -fPIC' CC='cc -fPIC' NO_SHARED=1 && make PREFIX=$INSTALL_DIR install
-  cd ..
-#fi
+cd ./OpenBLAS-0.2.20
+make -j$(echo ${proc}) 
+make PREFIX=$INSTALL_DIR install
+cd ..
 
-#if [ "$NERSC_HOST" != "cori" ]; then
-  cd scalapack_installer
-  python ./setup.py --downall --ccflags='-O3 -fPIC' --mpibindir=$INSTALL_DIR/bin --prefix=$INSTALL_DIR
-  make -j$(echo ${proc}) && make install
-  cd ..
-#fi
+#Install ScaLAPACK using OpenBLAS as the BLAS/LAPACK library
+cd scalapack_installer
+python ./setup.py --blaslib=$INSTALL_DIR/lib/libopenblas.a --ccflags='-O3' --mpibindir=$INSTALL_DIR/bin --prefix=$INSTALL_DIR --ldflags_fc="-lpthread"
+make -j$(echo ${proc}) && make install
+cd ..
 
 # STRUMPACK build
 # Parameterise for Cori login/Haswell, KNL, or non-Cori linux system
