@@ -11,7 +11,7 @@ SCOTCH=https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
 TCMALLOC=https://github.com/gperftools/gperftools/releases/download/gperftools-2.6.1/gperftools-2.6.1.tar.gz
 
 LAPACK=http://www.netlib.org/lapack/lapack-3.8.0.tar.gz
-SCALAPACK=http://www.netlib.org/scalapack/scalapack_installer.tgz
+SCALAPACK=http://www.netlib.org/scalapack/scalapack-2.0.2.tgz #http://www.netlib.org/scalapack/scalapack_installer.tgz
 OPENBLAS=http://github.com/xianyi/OpenBLAS/archive/v0.2.20.tar.gz
 CMAKE=https://cmake.org/files/v3.9/
 OPENMPI=https://www.open-mpi.org/software/ompi/v3.0/downloads/openmpi-3.0.0.tar.gz
@@ -56,7 +56,7 @@ fi
 #Download OpenMPI
 if [ ! -e OPENMPI.tar.gz ]; then
   echo "Downloading OPENMPI"
-  curl -L $OPENMPI -o OPENMPI.tar.gz
+  wget $OPENMPI -O OPENMPI.tar.gz
   mkdir ../strumpack_deps/OPENMPI
   tar xvf OPENMPI.tar.gz -C ../strumpack_deps/OPENMPI --strip-components 1 
 fi
@@ -135,11 +135,11 @@ pushd . > /dev/null;
 # Set the local bin directory on path for cmake, etc, as well as include paths
 export INSTALL_DIR=$PWD/strumpack_build
 export prefix=$INSTALL_DIR
-export PATH=$PATH:$PWD/strumpack_build/bin
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/strumpack_build/lib:$PWD/strumpack_build/lib64
+export PATH=$INSTALL_DIR/bin:$PATH
+export LD_LIBRARY_PATH=$INSTALL_DIR/lib:$INSTALL_DIR/lib64:$LD_LIBRARY_PATH
 
-LIB_DIR="-L$PWD/strumpack_build/lib -L$PWD/strumpack_build/lib64 -L$CONDA_PREFIX/lib "
-INC_DIR="-I$PWD/strumpack_build/include -I$CONDA_PREFIX/include "
+LIB_DIR="-L$INSTALL_DIR/lib -L$INSTALL_DIR/lib64 -L$CONDA_PREFIX/lib "
+INC_DIR="-I$INSTALL_DIR/include -I$CONDA_PREFIX/include "
 
 #Append Cray include and libs to build flags where necessary
 if [ "$NERSC_HOST" == "cori" ]; then
@@ -167,6 +167,11 @@ cd strumpack_deps
 #  alias mpicc='cc -fPIC'
 #  alias mpicxx='CC -fPIC'
 #fi
+cd ./OPENMPI
+  ./configure --prefix=$INSTALL_DIR --with-verbs=no CFLAGS='-fPIC -m64' CXXFLAGS='-fPIC -m64' FCFLAGS='-fPIC -m64' --disable-oshmem #Needed to build on Cray systems
+make -j$(echo ${proc}) && make install
+cd ..
+
 cd ./metis-5.1.0;
 if [ "$NERSC_HOST" != "cori" ]; then
   make config cc='mpicc' shared=1 prefix=$INSTALL_DIR
@@ -191,7 +196,7 @@ cd ..
 cd ./scotch_6.0.4/src
 cp ./Make.inc/Makefile.inc.x86-64_pc_linux2.shlib ./Makefile.inc
 #sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
-sed -i.bak 's@-O3@'"-O3 "'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
+sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
 if [ "$NERSC_HOST" == "cori" ]; then
   sed -i.bak 's/gcc/cc/' ./Makefile.inc #Change default compiler
   sed -i.bak 's/mpicc/cc/' ./Makefile.inc #Change default compiler for mpi
@@ -213,18 +218,25 @@ make scotch_strumpack -j$(echo ${proc}) && make prefix=$INSTALL_DIR install_stru
 cd ../..
 
 # Install OpenBLAS; MKL might be a good option too
-if [ "$NERSC_HOST" != "cori" ]; then
-  cd ./OpenBLAS-0.2.20
-  make -j$(echo ${proc}) && make PREFIX=$INSTALL_DIR install
-  cd ..
-fi
+cd ./OpenBLAS-0.2.20
+make -j$(echo ${proc}) USE_OPENMP=1
+make PREFIX=$INSTALL_DIR install
+cd ..
 
-if [ "$NERSC_HOST" != "cori" ]; then
-  cd scalapack_installer
-  python ./setup.py --downall --mpibindir=$INSTALL_DIR/bin --prefix=$INSTALL_DIR
-  make -j$(echo ${proc}) && make install
-  cd ..
-fi
+# Install ScaLAPACK using OpenBLAS 
+cd scalapack-2.0.2
+mkdir build && cd build
+cmake .. -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_Fortran_FLAGS="-lpthread -fopenmp" \
+  -DCMAKE_C_FLAGS="-O3 -fPIC -fopenmp" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+make -j$(echo ${proc}) && make install
+cd ..
+
+#Install tcmalloc for faster memory allocation and freeing
+cd gperftools-2.6.1
+./autogen.sh
+./configure --prefix=$INSTALL_DIR
+make -j$(echo ${proc}) && make install
+cd ..
 echo "Finished"
 
 # STRUMPACK build
@@ -235,35 +247,41 @@ mkdir build
 cd build
 if [ "$NERSC_HOST" != "cori" ]; then #Not on a Cori node; use the locally built packages for all dependencies
   echo "Standard installation"
-  $INSTALL_DIR/bin/cmake ../  -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+  $INSTALL_DIR/bin/cmake ../  -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
  -DCMAKE_CXX_COMPILER=$INSTALL_DIR/bin/mpic++ -DCMAKE_C_COMPILER=$INSTALL_DIR/bin/mpicc \
   -DCMAKE_Fortran_COMPILER=$INSTALL_DIR/bin/mpifort \
-  -DSCALAPACK_LIBRARIES="$INSTALL_DIR/lib/libscalapack.a" \
-  -DMETIS_INCLUDES=$INSTALL_DIR/include -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.a \
-  -DPARMETIS_INCLUDES=$INSTALL_DIR/include -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.a \
-  -DSCOTCH_INCLUDES=$INSTALL_DIR/include -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
+  -DSCALAPACK_LIBRARIES="$INSTALL_DIR/lib/libscalapack.so" \
+  -DMETIS_INCLUDES=$INSTALL_DIR/include -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.so \
+  -DPARMETIS_INCLUDES=$INSTALL_DIR/include -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.so \
+  -DSCOTCH_INCLUDES=$INSTALL_DIR/include -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.so;$INSTALL_DIR/lib/libscotcherr.so;$INSTALL_DIR/lib/libptscotch.so;$INSTALL_DIR/lib/libptscotcherr.so" \
+  -DSTRUMPACK_USE_PARMETIS:BOOL=ON -DSTRUMPACK_USE_SCOTCH:BOOL=ON \
+   -DCMAKE_MODULE_LINKER_FLAGS="-ltcmalloc" -DCMAKE_EXE_LINKER_FLAGS="-ltcmalloc" \
+   -DCMAKE_CXX_FLAGS="-O3 -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -D__HAVE_OPENBLAS=1" \
+   -DCMAKE_C_FLAGS="-O3 -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -D__HAVE_OPENBLAS=1"
+
 elif [[ $(getconf _NPROCESSORS_ONLN) -ne 272 ]]; then #If not 272 cores, then we are on a login or Haswell node; use local mpi and MKL ScaLAPACK. Following the STRUMPACK Github Installer code
   echo "Default Cori login node/Haswell installation"
   cmake ../  -DBUILD_SHARED_LIBS:BOOL=ON -D_GLIBCXX_USE_CXX11_ABI=0 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
   -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
-  -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.a -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
-  -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.a -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
+  -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.so -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
+  -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.so -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
   -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.so;$INSTALL_DIR/lib/libscotcherr.so;$INSTALL_DIR/lib/libptscotch.so;$INSTALL_DIR/lib/libptscotcherr.so"
 else #Otherwise on a KNL node; Need to adjust so that the libraries used as KNL specific
   echo "KNL installation"
   cmake ../ -D_GLIBCXX_USE_CXX11_ABI=0  -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
    -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
    -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
-   -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.a -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
-   -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.a -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
+   -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.so -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
+   -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.so -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
    -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
 fi
 make -j ${proc} && make install
 popd > /dev/null
 
-cd ./build
-cp ./dispatcher_include_template.sh dispatcher_include_strumpack.sh
+update_dispatcher(){
+  cd ./build
+  cp ./dispatcher_include_template.sh dispatcher_include_strumpack.sh
 str='if [ -n "$LD_LIBRARY_PATH" ]; then \
   LD_LIBRARY_PATH="$LIBTBX_BUILD/../strumpack_build/lib:$LD_LIBRARY_PATH" \
   export LD_LIBRARY_PATH \
@@ -271,5 +289,6 @@ else \
   LD_LIBRARY_PATH="$LIBTBX_BUILD/../strumpack_build/lib" \
   export LD_LIBRARY_PATH \
  fi'
-sed -i "3 a ${str}" dispatcher_include_strumpack.sh
-libtbx.refresh
+  sed -i "3 a ${str}" dispatcher_include_strumpack.sh
+  libtbx.refresh
+}
