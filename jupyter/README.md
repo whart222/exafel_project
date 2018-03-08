@@ -33,7 +33,7 @@ Next, we create a JSON file configuring the required kernel paths, named `kernel
  "display_name": "libtbx.python",
  "language": "python",
  "argv": [
-"/global/cscratch1/sd/mlxd/nested_merging/exafel_project/137-nested_merge/libtbx_env.sh",
+"/global/cscratch1/sd/mlxd/libtbx_env.sh",
   "-f",
   "{connection_file}"
  ]
