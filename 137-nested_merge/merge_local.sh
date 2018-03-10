@@ -40,11 +40,11 @@ source ${PHENIX_ROOT}/phenix-installer-dev-2880-source/build/setpaths.sh
 
 phenix.xtriage ${trial}.mtz scaling.input.xray_data.obs_labels=Iobs |tee xtriage_${trial}.out && \
 
-phenix.refine ${EXAFEL_DIR}/exafel_project/nks/Refine_4/LM14_1colorYblyso_refine_4.pdb \
+phenix.refine ${EXAFEL_DIR}/nks/Refine_4/LM14_1colorYblyso_refine_4.pdb \
 refinement.output.prefix=${trial} \
 xray_data.file_name=${trial}.mtz \
 xray_data.labels="Iobs" \
-xray_data.r_free_flags.file_name=${EXAFEL_DIR}/exafel_project/nks/merge118/reflections.mtz \
+xray_data.r_free_flags.file_name=${EXAFEL_DIR}/nks/merge118/reflections.mtz \
 xray_data.r_free_flags.label=FreeR_flag \
 main.number_of_macro_cycles=3 optimize_xyz_weight=True \
 optimize_adp_weight=True nproc=20 \
@@ -55,7 +55,7 @@ refine.strategy="*individual_sites *individual_sites_real_space *rigid_body *ind
 xray_data.force_anomalous_flag_to_be_equal_to=True \
 main.wavelength=1.3853 --overwrite && \
 
-libtbx.python ${EXAFEL_DIR}/exafel_project/nks/map_height_at_atoms.py \
+libtbx.python ${EXAFEL_DIR}/nks/map_height_at_atoms.py \
 ${trial}_001.pdb \
 ${trial}.mtz \
 input.xray_data.labels=Iobs \
@@ -70,5 +70,5 @@ molprobity.flags.omegalyze=False molprobity.flags.rotalyze=False molprobity.flag
 molprobity.flags.nqh=False molprobity.flags.rna=False molprobity.flags.restraints=False \
 output.coot=False output.probe_dots=False output.prefix=${trial}_molprobity && \
 
-libtbx.python ${EXAFEL_DIR}/exafel_project/nks/json/to_json.py ${MERGE_ROOT} ${trial}
+libtbx.python ${EXAFEL_DIR}/nks/json/to_json.py ${MERGE_ROOT} ${trial}
 
