@@ -18,7 +18,7 @@ unit_cell_length_tolerance=0.0065 \
 raw_data.errors_from_sample_residuals=False \
 raw_data.sdfac_refine=True \
 raw_data.error_models.sdfac_refine.random_seed=42 \
-cell_rejection.unit_cell=79.0,79.0,38.1,90,90,90 \
+cell_rejection.unit_cell=78.95,78.95,38.12,90.0,90.0,90.0 \
 cell_rejection.space_group=P43212 \
 output.prefix=${trial}"
 

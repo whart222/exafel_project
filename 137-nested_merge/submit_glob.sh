@@ -24,5 +24,5 @@ for ii in $(seq -w 95 114); do
   cat sbatch_merge.sh | sed "s~<tag_template>~r0${ii}~g" | sed "s~<glob_template>~${g}~g" | sed "s~<tar_template>~${TARDIR}~g"  | sed "s~<data_out_template>~${OUTDIR}~g" > sbatch_merge_r0${ii}.sh
 
   #Submit the newly created script to the queue
-  sbatch sbatch_merge_r0${ii}.sh $PWD
+ # sbatch sbatch_merge_r0${ii}.sh $PWD
 done
