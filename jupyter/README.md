@@ -10,7 +10,7 @@ cctbx functionality:
 ```bash
 libtbx.ipython notebook --no-browser --port=8889
 ```
-The above command assumes that ipython was installed with the conda environment. If it was not, install it with `conda instal ipython` and then run `libtbx.refresh` to update the dispatcher to generate `libtbx.ipython`.
+The above command assumes that ipython was installed with the conda environment. If it was not, install it with `conda install ipython` and then run `libtbx.refresh` to update the dispatcher to generate `libtbx.ipython`.
 Take note of the generated token by running the notebook command, and copy it.
 
 Next, set up port forwarding of the Jupyter notebook remote instance to your local machine (run locally):
