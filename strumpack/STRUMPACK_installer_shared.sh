@@ -3,7 +3,9 @@
 # This script aims to download and build all dependencies for the installation of STRUMPACK in an automated way.
 # Differences may exist between machines, and work on this is tested mostly using the NERSC Cori supercomputer.
 
+# ***************************************************** #
 # Set urls for packages
+# ***************************************************** #
 STRUMPACK=https://github.com/pghysels/STRUMPACK.git
 METIS=http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
 PARMETIS=http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz
@@ -16,7 +18,9 @@ OPENBLAS=http://github.com/xianyi/OpenBLAS/archive/v0.2.20.tar.gz
 CMAKE=https://cmake.org/files/v3.9/
 OPENMPI=https://www.open-mpi.org/software/ompi/v3.0/downloads/openmpi-3.0.0.tar.gz
 
+# ***************************************************** #
 # Create directory structure
+# ***************************************************** #
 if [ ! -d ./strumpack_downloads ]; then
   mkdir strumpack_downloads
 fi
@@ -30,18 +34,19 @@ fi
 pushd . >/dev/null
 cd strumpack_downloads
 
+# ***************************************************** #
 # Setup NERSC environment for building
+# ***************************************************** #
 if [ "$NERSC_HOST" == "cori" ]; then
   module swap PrgEnv-intel PrgEnv-gnu
   module swap gcc gcc/4.9.3
   module load openmpi
-  #module load python/2.7-anaconda
-  #source activate ${1} ##Pass conda env name as argument
 fi
 
-#################################################
+# ***************************************************** #
 # Acquire STRUMPACK-sparse and all dependencies #
-#################################################
+# ***************************************************** #
+
 if [ ! -d ../strumpack_deps/STRUMPACK ]; then
   echo "Downloading STRUMPACK"
   git clone $STRUMPACK
@@ -132,16 +137,28 @@ fi
 popd > /dev/null
 pushd . > /dev/null;
 
-# Set the local bin directory on path for cmake, etc, as well as include paths
+# ***************************************************** #
+# Set the build environment variables
+# ***************************************************** #
+
 export INSTALL_DIR=$PWD/strumpack_build
+echo "INSTALL_DIR=$PWD/strumpack_build"
 export prefix=$INSTALL_DIR
+echo "prefix=$INSTALL_DIR"
 export PATH=$INSTALL_DIR/bin:$PATH
+echo "PATH=$INSTALL_DIR/bin:$PATH"
 export LD_LIBRARY_PATH=$INSTALL_DIR/lib:$INSTALL_DIR/lib64:$LD_LIBRARY_PATH
+echo "LD_LIBRARY_PATH=$INSTALL_DIR/lib:$INSTALL_DIR/lib64:$LD_LIBRARY_PATH"
 
 LIB_DIR="-L$INSTALL_DIR/lib -L$INSTALL_DIR/lib64 -L$CONDA_PREFIX/lib "
+echo "LIB_DIR=-L$INSTALL_DIR/lib -L$INSTALL_DIR/lib64 -L$CONDA_PREFIX/lib "
 INC_DIR="-I$INSTALL_DIR/include -I$CONDA_PREFIX/include "
+echo "INC_DIR=-I$INSTALL_DIR/include -I$CONDA_PREFIX/include "
 
-#Append Cray include and libs to build flags where necessary
+# ***************************************************** #
+# Append Cray include and libs to build flags for Cori 
+# ***************************************************** #
+
 if [ "$NERSC_HOST" == "cori" ]; then
   LIB_DIR="$LIB_DIR $(cc --cray-print-opts=libs)"
   INC_DIR="$INC_DIR $(cc --cray-print-opts=cflags)"
@@ -155,23 +172,29 @@ fi
 let proc=$(getconf _NPROCESSORS_ONLN)/2
 cd strumpack_deps
 
+
+# ***************************************************** #
 # Build all dependencies and dependency dependencies
+# ***************************************************** #
 
-#OPENMPI: Optional if to be included from modules/conda
-#if [ "$NERSC_HOST" != "cori" ]; then
-#  cd ./OPENMPI
-#  ./configure --prefix=$INSTALL_DIR --enable-mpi-thread-multiple --with-verbs=no
-#  make -j$(echo ${proc}) && make install
-#  cd ..
-#else
-#  alias mpicc='cc -fPIC'
-#  alias mpicxx='CC -fPIC'
-#fi
-cd ./OPENMPI
-  ./configure --prefix=$INSTALL_DIR --with-verbs=no CFLAGS='-fPIC -m64' CXXFLAGS='-fPIC -m64' FCFLAGS='-fPIC -m64' --disable-oshmem #Needed to build on Cray systems
-make -j$(echo ${proc}) && make install
-cd ..
+# ***************************************************** #
+# Build OpenMPI if cannot find an MPI installation on path
+# ***************************************************** #
+if command -v mpicc >/dev/null ;
+then
+  echo "Using mpicc from location"
+  echo $(command -v mpicc)
+else 
+  cd ./OPENMPI
+  ./configure --prefix=$INSTALL_DIR --with-verbs=no CFLAGS='-fPIC -m64' \
+             CXXFLAGS='-fPIC -m64' FCFLAGS='-fPIC -m64' --disable-oshmem 
+  make -j$(echo ${proc}) && make install
+  cd ..
+fi
 
+# ***************************************************** #
+# Build Metis for single node use
+# ***************************************************** #
 cd ./metis-5.1.0;
 if [ "$NERSC_HOST" != "cori" ]; then
   make config cc='mpicc' shared=1 prefix=$INSTALL_DIR
@@ -181,7 +204,9 @@ fi
 make -j$(echo ${proc}) && make install
 cd ..
 
-#Needs to have mpicc on the path; can install using conda install openmpi on Mac, or mpich/openmpi on linux
+# ***************************************************** #
+# Build ParMetis for distributed use
+# ***************************************************** #
 cd ./parmetis-4.0.3
 if [ "$NERSC_HOST" != "cori" ]; then
   make config cc='mpicc' shared=1 prefix=$INSTALL_DIR
@@ -191,8 +216,11 @@ fi
 make -j$(echo ${proc}) && make install
 cd ..
 
+# ***************************************************** #
+# Build Scotch and PTScotch libraries.
+# ***************************************************** #
+
 # Need to choose correct Makefile from those given; prefix needs to be passed as env variable; Path to include dir needed for MPI
-# Expects mpi.h to be in /usr/include; not ideal;
 cd ./scotch_6.0.4/src
 cp ./Make.inc/Makefile.inc.x86-64_pc_linux2.shlib ./Makefile.inc
 #sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
@@ -217,13 +245,18 @@ scotch_strumpack	:	required
 make scotch_strumpack -j$(echo ${proc}) && make prefix=$INSTALL_DIR install_strumpack -j$(echo ${proc}) 
 cd ../..
 
+# ***************************************************** #
 # Install OpenBLAS; MKL might be a good option too
+# ***************************************************** #
+
 cd ./OpenBLAS-0.2.20
 make -j$(echo ${proc}) USE_OPENMP=1
 make PREFIX=$INSTALL_DIR install
 cd ..
 
+# ***************************************************** #
 # Install ScaLAPACK using OpenBLAS 
+# ***************************************************** #
 cd scalapack-2.0.2
 mkdir build && cd build
 cmake .. -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_Fortran_FLAGS="-lpthread -fopenmp" \
@@ -231,15 +264,9 @@ cmake .. -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_Fortran_FLAGS="-lpthread -fopenmp" 
 make -j$(echo ${proc}) && make install
 cd ..
 
-#Install tcmalloc for faster memory allocation and freeing
-cd gperftools-2.6.1
-./autogen.sh
-./configure --prefix=$INSTALL_DIR
-make -j$(echo ${proc}) && make install
-cd ..
-echo "Finished"
-
+# ***************************************************** #
 # STRUMPACK build
+# ***************************************************** #
 # Parameterise for Cori login/Haswell, KNL, or non-Cori linux system
 pushd . > /dev/null;
 cd STRUMPACK
@@ -248,37 +275,49 @@ cd build
 if [ "$NERSC_HOST" != "cori" ]; then #Not on a Cori node; use the locally built packages for all dependencies
   echo "Standard installation"
   $INSTALL_DIR/bin/cmake ../  -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
- -DCMAKE_CXX_COMPILER=$INSTALL_DIR/bin/mpic++ -DCMAKE_C_COMPILER=$INSTALL_DIR/bin/mpicc \
-  -DCMAKE_Fortran_COMPILER=$INSTALL_DIR/bin/mpifort \
+ -DCMAKE_CXX_COMPILER=mpic++ -DCMAKE_C_COMPILER=mpicc \
+  -DCMAKE_Fortran_COMPILER=mpif90 \
   -DSCALAPACK_LIBRARIES="$INSTALL_DIR/lib/libscalapack.so" \
   -DMETIS_INCLUDES=$INSTALL_DIR/include -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.so \
   -DPARMETIS_INCLUDES=$INSTALL_DIR/include -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.so \
   -DSCOTCH_INCLUDES=$INSTALL_DIR/include -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.so;$INSTALL_DIR/lib/libscotcherr.so;$INSTALL_DIR/lib/libptscotch.so;$INSTALL_DIR/lib/libptscotcherr.so" \
   -DSTRUMPACK_USE_PARMETIS:BOOL=ON -DSTRUMPACK_USE_SCOTCH:BOOL=ON \
-   -DCMAKE_MODULE_LINKER_FLAGS="-ltcmalloc" -DCMAKE_EXE_LINKER_FLAGS="-ltcmalloc" \
-   -DCMAKE_CXX_FLAGS="-O3 -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -D__HAVE_OPENBLAS=1" \
-   -DCMAKE_C_FLAGS="-O3 -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -D__HAVE_OPENBLAS=1"
+   -DCMAKE_CXX_FLAGS="-O3 -D__HAVE_OPENBLAS=1" \
+   -DCMAKE_C_FLAGS="-O3 -D__HAVE_OPENBLAS=1" \
+   -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+   -DCMAKE_EXE_LINKER_FLAGS="-lz"
 
 elif [[ $(getconf _NPROCESSORS_ONLN) -ne 272 ]]; then #If not 272 cores, then we are on a login or Haswell node; use local mpi and MKL ScaLAPACK. Following the STRUMPACK Github Installer code
   echo "Default Cori login node/Haswell installation"
-  cmake ../  -DBUILD_SHARED_LIBS:BOOL=ON -D_GLIBCXX_USE_CXX11_ABI=0 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+  cmake ../  -DBUILD_SHARED_LIBS:BOOL=ON -D_GLIBCXX_USE_CXX11_ABI=0 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
   -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
   -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.so -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
   -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.so -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
-  -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.so;$INSTALL_DIR/lib/libscotcherr.so;$INSTALL_DIR/lib/libptscotch.so;$INSTALL_DIR/lib/libptscotcherr.so"
+  -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.so;$INSTALL_DIR/lib/libscotcherr.so;$INSTALL_DIR/lib/libptscotch.so;$INSTALL_DIR/lib/libptscotcherr.so" \
+  -DSTRUMPACK_USE_PARMETIS:BOOL=ON -DSTRUMPACK_USE_SCOTCH:BOOL=ON 
+  -DCMAKE_CXX_FLAGS="-O3" -DCMAKE_C_FLAGS="-O3" \
+  -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+  -DCMAKE_EXE_LINKER_FLAGS="-lz"
 else #Otherwise on a KNL node; Need to adjust so that the libraries used as KNL specific
   echo "KNL installation"
-  cmake ../ -D_GLIBCXX_USE_CXX11_ABI=0  -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+  cmake ../ -D_GLIBCXX_USE_CXX11_ABI=0  -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
    -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
    -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
    -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.so -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
    -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.so -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
    -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
+  -DSTRUMPACK_USE_PARMETIS:BOOL=ON -DSTRUMPACK_USE_SCOTCH:BOOL=ON \
+  -DCMAKE_CXX_FLAGS="-O3" -DCMAKE_C_FLAGS="-O3" \
+  -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+  -DCMAKE_EXE_LINKER_FLAGS="-lz"
 fi
 make -j ${proc} && make install
 popd > /dev/null
 
+# ***************************************************** #
+# Update the dispatcher to expose the built libs
+# ***************************************************** #
 update_dispatcher(){
   cd ./build
   cp ./dispatcher_include_template.sh dispatcher_include_strumpack.sh
@@ -292,3 +331,4 @@ else \
   sed -i "3 a ${str}" dispatcher_include_strumpack.sh
   libtbx.refresh
 }
+# ***************************************************** #
