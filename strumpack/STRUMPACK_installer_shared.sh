@@ -180,7 +180,7 @@ cd strumpack_deps
 # ***************************************************** #
 # Build OpenMPI if cannot find an MPI installation on path
 # ***************************************************** #
-if command -v mpicc >/dev/null ;
+if [[ -x "$(command -v mpicc)" ]] || [[ "$NERSC_HOST" != "cori" ]];
 then
   echo "Using mpicc from location"
   echo $(command -v mpicc)
@@ -225,6 +225,7 @@ cd ./scotch_6.0.4/src
 cp ./Make.inc/Makefile.inc.x86-64_pc_linux2.shlib ./Makefile.inc
 #sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
 sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
+sed -i.bak 's@-DSCOTCH_PTHREAD@'" "'@' ./Makefile.inc #Remove -DSCOTCH_PTHREAD flag as causes issues within MPI environment
 if [ "$NERSC_HOST" == "cori" ]; then
   sed -i.bak 's/gcc/cc/' ./Makefile.inc #Change default compiler
   sed -i.bak 's/mpicc/cc/' ./Makefile.inc #Change default compiler for mpi
@@ -248,21 +249,24 @@ cd ../..
 # ***************************************************** #
 # Install OpenBLAS; MKL might be a good option too
 # ***************************************************** #
-
-cd ./OpenBLAS-0.2.20
-make -j$(echo ${proc}) USE_OPENMP=1
-make PREFIX=$INSTALL_DIR install
-cd ..
+if [ "$NERSC_HOST" != "cori" ];then
+  cd ./OpenBLAS-0.2.20
+  make -j$(echo ${proc}) USE_OPENMP=1
+  make PREFIX=$INSTALL_DIR install
+  cd ..
+fi
 
 # ***************************************************** #
 # Install ScaLAPACK using OpenBLAS 
 # ***************************************************** #
-cd scalapack-2.0.2
-mkdir build && cd build
-cmake .. -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_Fortran_FLAGS="-lpthread -fopenmp" \
-  -DCMAKE_C_FLAGS="-O3 -fPIC -fopenmp" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
-make -j$(echo ${proc}) && make install
-cd ..
+if [ "$NERSC_HOST" != "cori" ];then
+  cd scalapack-2.0.2
+  mkdir build && cd build
+  cmake .. -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_Fortran_FLAGS="-lpthread -fopenmp" \
+    -DCMAKE_C_FLAGS="-O3 -fPIC -fopenmp" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+  make -j$(echo ${proc}) && make install
+  cd ..
+fi
 
 # ***************************************************** #
 # STRUMPACK build
@@ -289,26 +293,26 @@ if [ "$NERSC_HOST" != "cori" ]; then #Not on a Cori node; use the locally built 
 
 elif [[ $(getconf _NPROCESSORS_ONLN) -ne 272 ]]; then #If not 272 cores, then we are on a login or Haswell node; use local mpi and MKL ScaLAPACK. Following the STRUMPACK Github Installer code
   echo "Default Cori login node/Haswell installation"
-  cmake ../  -DBUILD_SHARED_LIBS:BOOL=ON -D_GLIBCXX_USE_CXX11_ABI=0 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+  cmake ../  -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
   -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
-  -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.so -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
-  -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.so -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
+  -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.a -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
+  -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.a -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
   -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.so;$INSTALL_DIR/lib/libscotcherr.so;$INSTALL_DIR/lib/libptscotch.so;$INSTALL_DIR/lib/libptscotcherr.so" \
   -DSTRUMPACK_USE_PARMETIS:BOOL=ON -DSTRUMPACK_USE_SCOTCH:BOOL=ON 
-  -DCMAKE_CXX_FLAGS="-O3" -DCMAKE_C_FLAGS="-O3" \
+  -DCMAKE_CXX_FLAGS="-dynamic" -DCMAKE_C_FLAGS="-dynamic" -DCMAKE_Fortran_FLAGS="-dynamic"\
   -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
   -DCMAKE_EXE_LINKER_FLAGS="-lz"
 else #Otherwise on a KNL node; Need to adjust so that the libraries used as KNL specific
   echo "KNL installation"
-  cmake ../ -D_GLIBCXX_USE_CXX11_ABI=0  -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-   -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
-   -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
-   -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.so -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
-   -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.so -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
-   -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
+  cmake ../ -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+  -DCMAKE_CXX_COMPILER=CC -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn \
+  -DCMAKE_EXE_LINKER_FLAGS="-dynamic" -DMETIS_INCLUDES=$INSTALL_DIR/include \
+  -DMETIS_LIBRARIES=$INSTALL_DIR/lib/libmetis.a -DPARMETIS_INCLUDES=$INSTALL_DIR/include \
+  -DPARMETIS_LIBRARIES=$INSTALL_DIR/lib/libparmetis.a -DSCOTCH_INCLUDES=$INSTALL_DIR/include \
+  -DSCOTCH_LIBRARIES="$INSTALL_DIR/lib/libscotch.a;$INSTALL_DIR/lib/libscotcherr.a;$INSTALL_DIR/lib/libptscotch.a;$INSTALL_DIR/lib/libptscotcherr.a"
   -DSTRUMPACK_USE_PARMETIS:BOOL=ON -DSTRUMPACK_USE_SCOTCH:BOOL=ON \
-  -DCMAKE_CXX_FLAGS="-O3" -DCMAKE_C_FLAGS="-O3" \
+  -DCMAKE_CXX_FLAGS="-dynamic" -DCMAKE_C_FLAGS="-dynamic" -DCMAKE_Fortran_FLAGS="-dynamic" \
   -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
   -DCMAKE_EXE_LINKER_FLAGS="-lz"
 fi
@@ -318,9 +322,8 @@ popd > /dev/null
 # ***************************************************** #
 # Update the dispatcher to expose the built libs
 # ***************************************************** #
-update_dispatcher(){
-  cd ./build
-  cp ./dispatcher_include_template.sh dispatcher_include_strumpack.sh
+cd $INSTALL_DIR/../build
+cp ./dispatcher_include_template.sh dispatcher_include_strumpack.sh
 str='if [ -n "$LD_LIBRARY_PATH" ]; then \
   LD_LIBRARY_PATH="$LIBTBX_BUILD/../strumpack_build/lib:$LD_LIBRARY_PATH" \
   export LD_LIBRARY_PATH \
@@ -330,5 +333,4 @@ else \
  fi'
   sed -i "3 a ${str}" dispatcher_include_strumpack.sh
   libtbx.refresh
-}
 # ***************************************************** #
