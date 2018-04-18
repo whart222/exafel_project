@@ -17,10 +17,10 @@ python bootstrap.py build --builder=xfel --with-python=`which python` --nproc=<N
 source ./build/setpaths.sh;
 ```
 
-The MPI-enabled work requires the *cctbx_project* git repository be checked-out into the *mpi_strumpack* branch (eventually all changes will be merged with upstream *master*).
+The MPI-enabled work requires the *cctbx_project* git repository be checked-out into the *strumpack_solver_backend* branch (eventually all changes will be merged with upstream *master*).
 ```bash 
 cd modules/cctbx_project
-git checkout mpi_strumpack
+git checkout strumpack_solver_backend
 cd ../..
 ```
 
