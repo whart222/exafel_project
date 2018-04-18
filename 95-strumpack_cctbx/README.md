@@ -2,7 +2,7 @@
 Here are the documented results of using Strumpack on a single node for a variety of data set sizes (`StrumpackSolverMPI_1K`,`StrumpackSolverMPI_5K`,`StrumpackSolverMPI_10K`). All tests were performed on `dials.lbl.gov`, and allow the tests to be repeated at the user's discretion. Example matrices for a variety of different refinement parameters are listed in the given paths, and the times represent a single solution.
 
 # Setting up and running STRUMPACK
-To build STRUMPACK alongside a conda cctbx.xfel build, follow the instructions given (here)[https://exafel.github.io/docs/psana-cctbx-install]/(here)[https://github.com/ExaFEL/exafel_project/tree/master/nks] with the conda packages ammended to the following before building cctbx:
+To build STRUMPACK alongside a conda cctbx.xfel build, follow the instructions given [here](https://exafel.github.io/docs/psana-cctbx-install)/[here](https://github.com/ExaFEL/exafel_project/tree/master/nks) with the conda packages ammended to the following before building cctbx:
 
 ```bash
 source activate myEnv;
@@ -49,4 +49,4 @@ Full integration with Samosa will be provided shortly to allow the solvers to be
 A full-scale test of the scalability of the solvers on Cori for KNL and Haswell with OpenMP for intra-node tests, and MPI+OpeMP for inter-node tests is currently in progress.
 
 # Experimental spack build
-An experimental set of commands to build STRUMPACK using spack is given (here)[https://github.com/ExaFEL/exafel_project/tree/master/95-strumpack_cctbx/spack_installation]. This is not supported, and not guaranteed to work. It was used as an example environment to build STRUMPACK dependencies.
+An experimental set of commands to build STRUMPACK using spack is given [here](https://github.com/ExaFEL/exafel_project/tree/master/95-strumpack_cctbx/spack_installation). This is not supported, and not guaranteed to work. It was used as an example environment to build STRUMPACK dependencies.
