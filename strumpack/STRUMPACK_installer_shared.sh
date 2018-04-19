@@ -141,6 +141,8 @@ pushd . > /dev/null;
 # Set the build environment variables
 # ***************************************************** #
 
+export DEPS_DIR=$PWD/strumpack_deps
+echo "DEPS_DIR=$PWD/strumpack_build"
 export INSTALL_DIR=$PWD/strumpack_build
 echo "INSTALL_DIR=$PWD/strumpack_build"
 export prefix=$INSTALL_DIR
@@ -195,7 +197,7 @@ fi
 # ***************************************************** #
 # Build Metis for single node use
 # ***************************************************** #
-cd ./metis-5.1.0;
+cd ${DEPS_DIR}/metis-5.1.0;
 if [ "$NERSC_HOST" != "cori" ]; then
   make config cc='mpicc' shared=1 prefix=$INSTALL_DIR
 else
@@ -207,7 +209,7 @@ cd ..
 # ***************************************************** #
 # Build ParMetis for distributed use
 # ***************************************************** #
-cd ./parmetis-4.0.3
+cd ${DEPS_DIR}/parmetis-4.0.3
 if [ "$NERSC_HOST" != "cori" ]; then
   make config cc='mpicc' shared=1 prefix=$INSTALL_DIR
 else
@@ -221,7 +223,7 @@ cd ..
 # ***************************************************** #
 
 # Need to choose correct Makefile from those given; prefix needs to be passed as env variable; Path to include dir needed for MPI
-cd ./scotch_6.0.4/src
+cd ${DEPS_DIR}/scotch_6.0.4/src
 cp ./Make.inc/Makefile.inc.x86-64_pc_linux2.shlib ./Makefile.inc
 #sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
 sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
@@ -250,7 +252,7 @@ cd ../..
 # Install OpenBLAS; MKL might be a good option too
 # ***************************************************** #
 if [ "$NERSC_HOST" != "cori" ];then
-  cd ./OpenBLAS-0.2.20
+  cd ${DEPS_DIR}/OpenBLAS-0.2.20
   make -j$(echo ${proc}) USE_OPENMP=1
   make PREFIX=$INSTALL_DIR install
   cd ..
@@ -260,10 +262,10 @@ fi
 # Install ScaLAPACK using OpenBLAS 
 # ***************************************************** #
 if [ "$NERSC_HOST" != "cori" ];then
-  cd scalapack-2.0.2
+  cd ${DEPS_DIR}/scalapack-2.0.2
   mkdir build && cd build
-  cmake .. -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_Fortran_FLAGS="-lpthread -fopenmp" \
-    -DCMAKE_C_FLAGS="-O3 -fPIC -fopenmp" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+  cmake .. -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_Fortran_FLAGS="-lpthread -fopenmp"\
+    -DCMAKE_C_FLAGS="-O3 -fPIC -fopenmp" -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}
   make -j$(echo ${proc}) && make install
   cd ..
 fi
@@ -273,7 +275,7 @@ fi
 # ***************************************************** #
 # Parameterise for Cori login/Haswell, KNL, or non-Cori linux system
 pushd . > /dev/null;
-cd STRUMPACK
+cd ${DEPS_DIR}/STRUMPACK
 mkdir build
 cd build
 if [ "$NERSC_HOST" != "cori" ]; then #Not on a Cori node; use the locally built packages for all dependencies
