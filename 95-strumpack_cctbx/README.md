@@ -2,10 +2,9 @@
 Here are the documented results of using Strumpack on a single node for a variety of data set sizes (`StrumpackSolverMPI_1K`,`StrumpackSolverMPI_5K`,`StrumpackSolverMPI_10K`). All tests were performed on `dials.lbl.gov`, and allow the tests to be repeated at the user's discretion. Example matrices for a variety of different refinement parameters are listed in the given paths, and the times represent a single solution.
 
 # Setting up and running STRUMPACK
-To build STRUMPACK alongside a conda cctbx.xfel build, follow the instructions given [here](https://exafel.github.io/docs/psana-cctbx-install)/[here](https://github.com/ExaFEL/exafel_project/tree/master/nks) with the conda packages ammended to the following before building cctbx:
+To build STRUMPACK alongside a conda cctbx.xfel build, follow the instructions given [here](https://exafel.github.io/docs/psana-cctbx-install)/[here](https://github.com/ExaFEL/exafel_project/tree/master/nks) with the final conda packages ammended to the following before building cctbx:
 
 ```bash
-source activate myEnv;
 conda install -y IPython h5py wxpython pillow libtiff mysql-python jinja2 matplotlib scipy mpi4py;
 ```
 
@@ -32,7 +31,7 @@ chmod +x STRUMPACK_installer_shared.sh
 ./STRUMPACK_installer_shared.sh
 ```
 
-The STRUMPACK (and dependencies) binmaries, libraries and headers will be installed into `strumpack_build/{bin,lib,include}`, of which will be added to the dispatcher environment given successful completion of the installation script. With the presence of the new libraries, refreshing the dispacther and rebuilding the packaes will alow any STRUMPACK-enabled Boost.Python extension modules to be built.
+The STRUMPACK (and dependencies) binaries, libraries and headers will be installed into `strumpack_build/{bin,lib,include}`, of which will be added to the dispatcher environment given successful completion of the installation script. With the presence of the new libraries, refreshing the dispatcher and rebuilding the packages will allow any STRUMPACK-enabled Boost.Python extension modules to be built.
 
 ```bash
 cd build && libtbx.refresh
