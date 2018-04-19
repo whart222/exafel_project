@@ -5,7 +5,8 @@ Here are the documented results of using Strumpack on a single node for a variet
 To build STRUMPACK alongside a conda cctbx.xfel build, follow the instructions given [here](https://exafel.github.io/docs/psana-cctbx-install)/[here](https://github.com/ExaFEL/exafel_project/tree/master/nks) with the final conda packages ammended to the following before building cctbx:
 
 ```bash
-conda install -y IPython h5py wxpython pillow libtiff mysql-python jinja2 matplotlib scipy mpi4py;
+conda install -y IPython h5py wxpython pillow libtiff mysql-python\
+  jinja2 matplotlib scipy mpi4py jupyter ipyparallel;
 ```
 
 Building is now carried out as normal:
@@ -42,6 +43,8 @@ To test the new libraries several test scripts are available, for a provided A m
 Sample run commands are given in the provided notebooks.
 
 Full integration with Samosa will be provided shortly to allow the solvers to be used therein. Initial work to provide selective choice of the Eigen solver backend is available in the `eigen_solver_algo` branch of `https://github.com/cctbx/cctbx_project/`.
+
+
 
 # Scalability tests on Cori
 
