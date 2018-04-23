@@ -48,7 +48,7 @@ Full integration with Samosa will be provided shortly to allow the solvers to be
 
 # Scalability tests on Cori
 
-A full-scale test of the scalability of the solvers on Cori for KNL and Haswell with OpenMP for intra-node tests, and MPI+OpeMP for inter-node tests is currently in progress.
+Scalability testing of the OpenMP and MPI backends are available in Jupyter notebook [StrumpackSolverMPI_dist_Cori.ipynb](https://github.com/ExaFEL/exafel_project/blob/master/95-strumpack_cctbx/StrumpackSolverMPI_dist_Cori.ipynb)
 
 # Experimental spack build
 An experimental set of commands to build STRUMPACK using spack is given [here](https://github.com/ExaFEL/exafel_project/tree/master/95-strumpack_cctbx/spack_installation). This is not supported, and not guaranteed to work. It was used as an example environment to build STRUMPACK dependencies.
