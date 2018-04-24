@@ -229,8 +229,9 @@ cp ./Make.inc/Makefile.inc.x86-64_pc_linux2.shlib ./Makefile.inc
 sed -i.bak 's@-O3@'"-O3 $INC_DIR"'@' ./Makefile.inc #Add CFLAGS env variable into compile path for mpi headers
 sed -i.bak 's@-DSCOTCH_PTHREAD@'" "'@' ./Makefile.inc #Remove -DSCOTCH_PTHREAD flag as causes issues within MPI environment
 if [ "$NERSC_HOST" == "cori" ]; then
-  sed -i.bak 's/gcc/cc/' ./Makefile.inc #Change default compiler
-  sed -i.bak 's/mpicc/cc/' ./Makefile.inc #Change default compiler for mpi
+  sed -i.bak 's/gcc/cc -craympich-mt/' ./Makefile.inc #Change default compiler
+  sed -i.bak 's/mpicc/cc -craympich-mt/' ./Makefile.inc #Change default compiler for mpi
+  sed -i.bak 's/-shared/-shared -craympich-mt/' ./Makefile.inc #Ensure threading enabled for Cray MPICH
 fi
 rm ./Makefile.inc.bak
 #Patch scotch makefile to exclude everything except the shared libraries
