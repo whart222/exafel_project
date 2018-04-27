@@ -2,11 +2,10 @@
 Here are the documented results of using Strumpack on a single node for a variety of data set sizes (`StrumpackSolverMPI_1K`,`StrumpackSolverMPI_5K`,`StrumpackSolverMPI_10K`). All tests were performed on `dials.lbl.gov`, and allow the tests to be repeated at the user's discretion. Example matrices for a variety of different refinement parameters are listed in the given paths, and the times represent a single solution.
 
 # Setting up and running STRUMPACK
-To build STRUMPACK alongside a conda cctbx.xfel build, follow the instructions given [here](https://exafel.github.io/docs/psana-cctbx-install)/[here](https://github.com/ExaFEL/exafel_project/tree/master/nks) with the final conda packages ammended to the following before building cctbx:
+To build STRUMPACK alongside a conda cctbx.xfel build, follow the instructions given [here](https://exafel.github.io/docs/psana-cctbx-install)/[here](https://github.com/ExaFEL/exafel_project/tree/master/nks) with the following additional conda packages before building cctbx:
 
 ```bash
-conda install -y IPython h5py wxpython pillow libtiff mysql-python\
-  jinja2 matplotlib scipy mpi4py jupyter ipyparallel;
+conda install -y IPython mysql-python matplotlib scipy mpi4py jupyter ipyparallel;
 ```
 
 Building is now carried out as normal:
