@@ -1,0 +1,39 @@
+# Docker/Shifter container image of cctbx.xfel
+# Designed for use with XTC data streams on NERSC's Cori
+# Based upon original scripts by M. Uervirojnangkoorn And C Yoon.
+
+FROM centos:centos7
+MAINTAINER Lee O'Riordan <loriordan@lbl.gov>
+
+RUN yum clean all &&  yum -y install bzip2.x86_64 libgomp.x86_64 telnet.x86_64 gcc-c++ gcc-gfortran && yum groupinstall "Development Tools" -y
+
+# https://repo.continuum.io/miniconda/
+ADD Miniconda2-latest-Linux-x86_64.sh miniconda.sh
+ADD bootstrap.py bootstrap.py
+RUN chmod +x miniconda.sh && echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && /bin/bash miniconda.sh -b -p /opt/conda && rm miniconda.sh
+ENV PATH /opt/conda/bin:$PATH
+ENV LD_LIBRARY_PATH /opt/conda/lib:$LD_LIBRARY_PATH
+
+# psana-conda
+RUN conda update -y conda && conda install -y --channel lcls-rhel7 psana-conda && conda install -y future h5py mpich2 wxpython pillow libtiff mock pytest jinja2 scikit-learn tabulate pytables scons mysql-python && conda install -y --channel conda-forge orderedset && python -m pip install procrunner && rm -rf /opt/conda/lib/python2.7/site-packages/numexpr-2.6.2-py2.7.egg-info
+
+# recreate /reg/d directories for data
+RUN mkdir -p /reg/g &&\
+    mkdir -p /reg/d/psdm/CXI &&\
+    mkdir -p /reg/d/psdm/cxi
+
+# cctbx
+ADD modules modules
+RUN python bootstrap.py build --builder=xfel --with-python=/opt/conda/bin/python --nproc=4 && python bootstrap.py build --builder=xfel --with-python=/opt/conda/bin/python --nproc=4 && conda uninstall --force mpich2
+
+RUN mkdir -p /reg/d/psdm/mfx &&\
+    mkdir -p /reg/d/psdm/MFX
+
+#Build Mpi4py from scratch against mpich
+ADD mpich-3.2.1 /mpich_src
+ADD mpi4py-3.0.0 /mpi4py_src
+
+RUN cd /mpich_src && ./configure && /usr/bin/make -j4 && /usr/bin/make install && /usr/bin/make clean && rm -rf /mpich_src
+RUN cd /mpi4py_src && /opt/conda/bin/python setup.py build && /opt/conda/bin/python setup.py install && rm -rf /mpi4py_src
+
+RUN /sbin/ldconfig
