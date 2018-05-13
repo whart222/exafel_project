@@ -1,6 +1,9 @@
-# Docker/Shifter container image of cctbx.xfel
 # Designed for use with XTC data streams on NERSC's Cori
-# Based upon original scripts by M. Uervirojnangkoorn And C Yoon.
+#
+# Run bootstrap.py with hot and update first to get the modules directory.
+# Next, add the Python2 Miniconda installer into the directory conttainer this file.
+# Acquire the sources for MPICH3.2.1 and MPI4PY 3.0, untar them and place them here also.
+# Run `docker build .` and wait for the image to build (may take some time)
 
 FROM centos:centos7
 MAINTAINER Lee O'Riordan <loriordan@lbl.gov>
@@ -33,7 +36,4 @@ RUN mkdir -p /reg/d/psdm/mfx &&\
 ADD mpich-3.2.1 /mpich_src
 ADD mpi4py-3.0.0 /mpi4py_src
 
-RUN cd /mpich_src && ./configure && /usr/bin/make -j4 && /usr/bin/make install && /usr/bin/make clean && rm -rf /mpich_src
-RUN cd /mpi4py_src && /opt/conda/bin/python setup.py build && /opt/conda/bin/python setup.py install && rm -rf /mpi4py_src
-
-RUN /sbin/ldconfig
+RUN cd /mpich_src && ./configure && /usr/bin/make -j4 && /usr/bin/make install && /usr/bin/make clean && rm -rf /mpich_src && cd /mpi4py_src && /opt/conda/bin/python setup.py build && /opt/conda/bin/python setup.py install && rm -rf /mpi4py_src && /sbin/ldconfig
