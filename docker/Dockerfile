@@ -23,14 +23,15 @@ RUN conda update -y conda && conda install -y --channel lcls-rhel7 psana-conda &
 # recreate /reg/d directories for data
 RUN mkdir -p /reg/g &&\
     mkdir -p /reg/d/psdm/CXI &&\
-    mkdir -p /reg/d/psdm/cxi
+    mkdir -p /reg/d/psdm/cxi &&\
+    mkdir -p /reg/d/psdm/mfx &&\
+    mkdir -p /reg/d/psdm/MFX
 
 # cctbx
 ADD modules modules
 RUN python bootstrap.py build --builder=xfel --with-python=/opt/conda/bin/python --nproc=4 && python bootstrap.py build --builder=xfel --with-python=/opt/conda/bin/python --nproc=4 && conda uninstall --force mpich2
 
-RUN mkdir -p /reg/d/psdm/mfx &&\
-    mkdir -p /reg/d/psdm/MFX
+
 
 #Build Mpi4py from scratch against mpich
 ADD mpich-3.2.1 /mpich_src
