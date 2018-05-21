@@ -18,7 +18,7 @@ ENV PATH /opt/conda/bin:$PATH
 ENV LD_LIBRARY_PATH /opt/conda/lib:$LD_LIBRARY_PATH
 
 # psana-conda
-RUN conda update -y conda && conda install -y --channel lcls-rhel7 psana-conda && conda install -y future h5py mpich2 wxpython pillow libtiff mock pytest jinja2 scikit-learn tabulate pytables scons mysql-python && conda install -y --channel conda-forge orderedset && python -m pip install procrunner && rm -rf /opt/conda/lib/python2.7/site-packages/numexpr-2.6.2-py2.7.egg-info
+RUN conda update -y conda && conda install -y --channel lcls-rhel7 psana-conda && conda install -y future ipython reportlab h5py mpich2 wxpython pillow libtiff mock pytest jinja2 scikit-learn tabulate pytables scons mysql-python && conda install -y --channel conda-forge orderedset && python -m pip install procrunner && rm -rf /opt/conda/lib/python2.7/site-packages/numexpr-2.6.2-py2.7.egg-info
 
 # recreate /reg/d directories for data
 RUN mkdir -p /reg/g &&\
