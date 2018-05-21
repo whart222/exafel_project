@@ -29,7 +29,7 @@ RUN mkdir -p /reg/g &&\
 
 # cctbx
 ADD modules modules
-RUN python bootstrap.py build --builder=xfel --with-python=/opt/conda/bin/python --nproc=4 && python bootstrap.py build --builder=xfel --with-python=/opt/conda/bin/python --nproc=4 && conda uninstall --force mpich2
+RUN python bootstrap.py build --builder=dials --with-python=/opt/conda/bin/python --nproc=4 && python bootstrap.py build --builder=xfel --with-python=/opt/conda/bin/python --nproc=4 && conda uninstall --force mpich2
 
 
 
