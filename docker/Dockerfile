@@ -31,8 +31,6 @@ RUN mkdir -p /reg/g &&\
 ADD modules modules
 RUN python bootstrap.py build --builder=dials --with-python=/opt/conda/bin/python --nproc=4 && python bootstrap.py build --builder=dials --with-python=/opt/conda/bin/python --nproc=4 && conda uninstall --force mpich2
 
-
-
 #Build Mpi4py from scratch against mpich
 ADD mpich-3.2.1 /mpich_src
 ADD mpi4py-3.0.0 /mpi4py_src
