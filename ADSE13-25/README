@@ -1,0 +1,1 @@
+IOTA code currently performs a brute force search over the algorithm parameter space. Deliverable is the ability to reproduce current results obtained from a Linux cluster.
