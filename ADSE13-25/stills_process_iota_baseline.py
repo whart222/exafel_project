@@ -30,6 +30,10 @@ iota {
     fraction_sub_sample = 0.2
       .type = float
       .help = fraction of sample to be sub-sampled. Should be between 0 and 1
+    consensus_function = *unit_cell
+      .type = choice
+      .help = choose the type of consensus function to be employed for random_sub_sampling. More details \
+              in the functions themselves
   }
 }
 '''
@@ -265,19 +269,21 @@ class Processor_iota(Processor):
         if self.params.iota.method == 'random_sub_sampling':
           from scitbx.array_family import flex
           len_max_indexed = -999
-          len_indexed_arr = []
+          experiments_list = []
           for trial in range(self.params.iota.random_sub_sampling.ntrials):
             observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
             try:
               experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
+              experiments_list.append(experiments_tmp)
             except:
               print('Indexing failed for some reason')
-            if len(indexed_tmp) >len_max_indexed:
-              len_max_indexed = len(indexed_tmp)
-              experiments = experiments_tmp
-              indexed = indexed_tmp 
-            len_indexed_arr.append(len(indexed_tmp))
-          print('fraction subsampled = ', self.params.iota.random_sub_sampling.fraction_sub_sample, len(indexed), len_indexed_arr)
+          #from IPython import embed; embed(); exit() 
+          if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
+            from consensus_functions import get_uc_consensus as get_consensus
+            self.known_crystal_models = [get_consensus(experiments_list)]
+            print ('Reindexing with best chosen crystal model')
+            experiments, indexed = self.index(datablock, observed)
+          print('fraction subsampled = ', self.params.iota.random_sub_sampling.fraction_sub_sample, len(indexed))
       else:
         print("Indexing turned off. Exiting")
         return
