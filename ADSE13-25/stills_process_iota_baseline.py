@@ -271,17 +271,21 @@ class Processor_iota(Processor):
           len_max_indexed = -999
           experiments_list = []
           for trial in range(self.params.iota.random_sub_sampling.ntrials):
+            flex.set_random_seed(trial+1001)
             observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
             try:
+              print ('SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']))
               experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
+              #from IPython import embed; embed(); exit() 
               experiments_list.append(experiments_tmp)
             except:
               print('Indexing failed for some reason')
-          #from IPython import embed; embed(); exit() 
+              #from IPython import embed; embed(); exit()
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
             from consensus_functions import get_uc_consensus as get_consensus
-            self.known_crystal_models = [get_consensus(experiments_list)]
+            self.known_crystal_models = [get_consensus(experiments_list, show_plot=False)]
             print ('Reindexing with best chosen crystal model')
+            #from IPython import embed; embed(); exit()
             experiments, indexed = self.index(datablock, observed)
           print('fraction subsampled = ', self.params.iota.random_sub_sampling.fraction_sub_sample, len(indexed))
       else:
