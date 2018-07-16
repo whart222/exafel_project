@@ -34,6 +34,9 @@ iota {
       .type = choice
       .help = choose the type of consensus function to be employed for random_sub_sampling. More details \
               in the functions themselves
+    ncandidates = 1
+      .type = int
+      .help = number of candidate basis vectors to consider
   }
 }
 '''
@@ -285,7 +288,6 @@ class Processor_iota(Processor):
             from consensus_functions import get_uc_consensus as get_consensus
             self.known_crystal_models = [get_consensus(experiments_list, show_plot=False)]
             print ('Reindexing with best chosen crystal model')
-            #from IPython import embed; embed(); exit()
             experiments, indexed = self.index(datablock, observed)
           print('fraction subsampled = ', self.params.iota.random_sub_sampling.fraction_sub_sample, len(indexed))
       else:

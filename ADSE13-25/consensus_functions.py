@@ -184,7 +184,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
   # Now look at each unit cell cluster for orientational clustering
   # idea is to cluster the orientational component in each of the unit cell clusters
   #  
-  do_orientational_clustering = True
+  do_orientational_clustering = False
   #from IPython import embed; embed(); exit()
   if do_orientational_clustering:
     Dij_ori = {} # dictionary to store Dij for each cluster
