@@ -27,9 +27,16 @@ iota {
     ntrials = 10
       .type = int
       .help = Number of random sub-samples to be selected
-    fraction_sub_sample = 1.0
+    fraction_sub_sample = 0.2
       .type = float
       .help = fraction of sample to be sub-sampled. Should be between 0 and 1
+    consensus_function = *unit_cell
+      .type = choice
+      .help = choose the type of consensus function to be employed for random_sub_sampling. More details \
+              in the functions themselves
+    ncandidates = 1
+      .type = int
+      .help = number of candidate basis vectors to consider
   }
 }
 '''
@@ -171,7 +178,6 @@ class Script_iota(Script):
 
       # Wrapper function
       def do_work(i, item_list):
-        print ('Hello from rank %d'%i)
         processor = Processor_iota(copy.deepcopy(params), composite_tag = "%04d"%i)
         for item in item_list:
           tag, filename = item
@@ -207,10 +213,9 @@ class Script_iota(Script):
       comm = MPI.COMM_WORLD
       rank = comm.Get_rank() # each process in MPI has a unique id, 0-indexed
       size = comm.Get_size() # size: number of processes running in this job
-      logger.info("hello from rank %d out of %d"%(rank,size))
-      subset = [item for i, item in enumerate(iterable) if (i+rank)%size == 0]
+      subset = [item for i, item in enumerate(iterable) if (i+rank)%size== 0] 
       do_work(rank, subset)
-
+      comm.barrier()
     else:
       from dxtbx.command_line.image_average import splitit
       if params.mp.nproc == 1:
@@ -238,8 +243,6 @@ class Processor_iota(Processor):
     if not self.params.output.composite_output:
       self.setup_filenames(tag)
     self.tag = tag
-
-    #from IPython import embed; embed(); exit()
     print('MP method = ',self.params.mp.method)
     if self.params.output.datablock_filename:
       from dxtbx.datablock import DataBlockDumper
@@ -263,13 +266,30 @@ class Processor_iota(Processor):
       print("Error spotfinding", tag, str(e))
       if not self.params.dispatch.squash_errors: raise
       return
+    #from IPython import embed; embed(); exit()
     try:
       if self.params.dispatch.index:
         if self.params.iota.method == 'random_sub_sampling':
           from scitbx.array_family import flex
-          observed = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
-          #from IPython import embed; embed(); exit()
-        experiments, indexed = self.index(datablock, observed)
+          len_max_indexed = -999
+          experiments_list = []
+          for trial in range(self.params.iota.random_sub_sampling.ntrials):
+            flex.set_random_seed(trial+1001)
+            observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
+            try:
+              print ('SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']))
+              experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
+              #from IPython import embed; embed(); exit() 
+              experiments_list.append(experiments_tmp)
+            except:
+              print('Indexing failed for some reason')
+              #from IPython import embed; embed(); exit()
+          if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
+            from consensus_functions import get_uc_consensus as get_consensus
+            self.known_crystal_models = [get_consensus(experiments_list, show_plot=False)]
+            print ('Reindexing with best chosen crystal model')
+            experiments, indexed = self.index(datablock, observed)
+          print('fraction subsampled = ', self.params.iota.random_sub_sampling.fraction_sub_sample, len(indexed))
       else:
         print("Indexing turned off. Exiting")
         return
