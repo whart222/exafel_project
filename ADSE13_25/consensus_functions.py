@@ -14,16 +14,23 @@ def get_dij_ori(cryst1, cryst2, is_reciprocal=True):
   Takes in 2 dxtbx crystal models, returns the distance between the 2 models in crystal
   space. Currently the distance is defined as the Z-score difference as implemented in 
   cctbx/uctbx
+  Info regarding some params in best_similarity_transformation after discussion with NKS
+  fractional_length_tolerance :: could have value 1 or 200 ??
+  unimodular_generator_range = to keep the volume to be 1. If volume doubles on change of basis, make it 2
 
   '''
   from scitbx.math import flex
   from cctbx_orientation_ext import crystal_orientation
   cryst1_ori = crystal_orientation(cryst1.get_A(), is_reciprocal)
   cryst2_ori = crystal_orientation(cryst2.get_A(), is_reciprocal)
-  best_similarity_transform = cryst2_ori.best_similarity_transformation(
-      other = cryst1_ori, fractional_length_tolerance = 1.00,
-      unimodular_generator_range=1) 
-  cryst2_ori_best=cryst2_ori.change_basis(best_similarity_transform)
+  try:
+    best_similarity_transform = cryst2_ori.best_similarity_transformation(
+        other = cryst1_ori, fractional_length_tolerance = 1.00,
+        unimodular_generator_range=1) 
+    cryst2_ori_best=cryst2_ori.change_basis(best_similarity_transform)
+  except:
+    cryst2_ori_best = cryst2_ori
+  print 'difference z-score = ', cryst1_ori.difference_Z_score(cryst2_ori_best)
   return cryst1_ori.difference_Z_score(cryst2_ori_best)
 
 
@@ -33,6 +40,9 @@ class clustering_manager(group_args):
     print ('finished Dij, now calculating rho_i and density')
     from xfel.clustering import Rodriguez_Laio_clustering_2014 as RL
     R = RL(distance_matrix = self.Dij, d_c = self.d_c)
+    #from IPython import embed; embed(); exit()
+    #from clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding
+    #plot_with_dimensional_embedding(1-self.Dij/flex.max(self.Dij), show_plot=True)
     self.rho = rho = R.get_rho()
     ave_rho = flex.mean(rho.as_double())
     NN = self.Dij.focus()[0]
@@ -43,21 +53,24 @@ class clustering_manager(group_args):
     self.delta = delta = R.get_delta(rho_order=rho_order, delta_i_max=delta_i_max)
     cluster_id = flex.int(NN, -1) # -1 means no cluster
     delta_order = flex.sort_permutation(delta, reverse=True)
-    N_CLUST = 10               # maximum number of points to be considerd a cluster
-    MAX_PERCENTILE_RHO = 0.95 # cluster centers have to be in the top percentile
+    MAX_PERCENTILE_RHO = self.max_percentile_rho # cluster centers have to be in the top percentile
     n_cluster = 0
+#
+#
     for ic in range(NN):
       # test the density & rho
       item_idx = delta_order[ic] 
       if ic != 0:
         if delta[item_idx] <= 0.25*delta[delta_order[0]]: # too low to be a medoid
           continue 
+      #from IPython import embed; embed()
       item_rho_order = rho_order_list.index(item_idx)
-      #from IPython import embed; embed(); exit()
-      if (item_rho_order)/NN < 1-MAX_PERCENTILE_RHO:
+      if (item_rho_order)/NN < MAX_PERCENTILE_RHO:
         cluster_id[item_idx] = n_cluster
         print ('CLUSTERING_STATS',ic,item_idx,item_rho_order,cluster_id[item_idx])
         n_cluster +=1
+#
+#
     print ('Found %d clusters'%n_cluster)
     for x in range(NN):
       if cluster_id[x] >= 0:
@@ -146,7 +159,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
   #from IPython import embed; embed(); exit()
   from scitbx.math import five_number_summary
   d_c = 6.13 #five_number_summary(list(Dij))[1]
-  CM = clustering_manager(Dij=Dij, d_c=d_c)
+  CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=0.95)
   n_cluster = 1+flex.max(CM.cluster_id_final)
   print (len(cells), ' datapoints have been analyzed')
   print ('%d CLUSTERS'%n_cluster)
@@ -184,30 +197,62 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
   # Now look at each unit cell cluster for orientational clustering
   # idea is to cluster the orientational component in each of the unit cell clusters
   #  
-  do_orientational_clustering = False
+  do_orientational_clustering = True
   #from IPython import embed; embed(); exit()
   if do_orientational_clustering:
     Dij_ori = {} # dictionary to store Dij for each cluster
+    uc_experiments_list = {} # dictionary to store experiments_lists for each cluster
     from collections import Counter
     uc_cluster_count = Counter(list(CM.cluster_id_final))
     # instantiate the Dij_ori flat 1-d array
+    #from IPython import embed; embed();
+    # Put all experiments list from same uc cluster together
+    if True:
+      from scitbx.matrix import sqr
+      from cctbx_orientation_ext import crystal_orientation
+      crystal_orientation_list = []
+      for i in range(len(experiments_list)):
+        crystal_orientation_list.append(crystal_orientation(experiments_list[i].crystals()[0].get_A(), True))
+        #from IPython import embed; embed(); exit() 
+        A_direct = sqr(crystal_orientation_list[i].reciprocal_matrix()).transpose().inverse()
+        print ("Direct A matrix 1st element = %12.6f"%A_direct[0])
+    for i in range(len(experiments_list)):
+      if CM.cluster_id_full[i] not in uc_experiments_list:
+        uc_experiments_list[CM.cluster_id_full[i]] = []
+      uc_experiments_list[CM.cluster_id_full[i]].append(experiments_list[i])
     for cluster in uc_cluster_count:
+      # Make sure there are atleast a minimum number of samples in the cluster
+      if uc_cluster_count[cluster] < 5:  
+        continue
       Dij_ori[cluster] = flex.double([[0.0]*uc_cluster_count[cluster]]*uc_cluster_count[cluster])
     # Now populate the Dij_ori array
-      for i in range(len(experiments_list)-1):
-        for j in range(i+1, len(experiments_list)):
-          if CM.cluster_id_final[i] == CM.cluster_id_final[j]:
-            dij_ori = get_dij_ori(experiments_list[i].crystals()[0],experiments_list[j].crystals()[0])
-            Dij_ori[CM.cluster_id_final[i]][len(experiments_list)*i+j] = dij_ori
-            Dij_ori[CM.cluster_id_final[i]][len(experiments_list)*j+i] = dij_ori
+      N_samples_in_cluster = len(uc_experiments_list[cluster])
+      #from IPython import embed; embed();
+      for i in range(N_samples_in_cluster-1):
+        for j in range(i+1, N_samples_in_cluster):
+          dij_ori = get_dij_ori(uc_experiments_list[cluster][i].crystals()[0],uc_experiments_list[cluster][j].crystals()[0])
+          Dij_ori[cluster][N_samples_in_cluster*i+j] = dij_ori
+          Dij_ori[cluster][N_samples_in_cluster*j+i] = dij_ori
 
     # Now do the orientational cluster analysis 
     d_c_ori = 0.13
-    for cluster in uc_cluster_count:
-      CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori)
-    #n_cluster = 1+flex.max(CM.cluster_id_final)
-
-  
+    from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding 
+    #plot_with_dimensional_embedding(1-Dij_ori[1]/flex.max(Dij_ori[1]), show_plot=True)
+    for cluster in Dij_ori:
+      CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85)
+      if show_plot:
+        # Decision graph
+        stretch_plot_factor = 1.05 # (1+fraction of limits by which xlim,ylim should be set)
+        import matplotlib.pyplot as plt
+        plt.plot(CM_ori.rho, CM_ori.delta, "r.", markersize=3.)
+        for x in xrange(len(list(CM_ori.cluster_id_final))):
+          if CM_ori.cluster_id_maxima[x] >=0:
+            plt.plot([CM_ori.rho[x]], [CM_ori.delta[x]], "ro")
+        #from IPython import embed; embed(); exit()
+        plt.xlim([-10,stretch_plot_factor*flex.max(CM_ori.rho)])
+        plt.ylim([-10,stretch_plot_factor*flex.max(CM_ori.delta)])
+        plt.show()
+  from IPython import embed; embed(); exit()
   # FIXME Still to be worked out what exactly should be returned 
   return experiments_list[0].crystals()[0]
    

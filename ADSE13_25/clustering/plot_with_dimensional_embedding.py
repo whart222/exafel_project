@@ -15,8 +15,8 @@ class lbfgs_helper():
     self.x = initial.deep_copy()
     self.minimizer = scitbx.lbfgs.run(target_evaluator=self,
                      termination_params = scitbx.lbfgs.termination_parameters
-                     (traditional_convergence_test_eps=1.e-1, min_iterations=0), core_params =
-                     scitbx.lbfgs.core_parameters(gtol=0.9), log=sys.stdout)
+                     (traditional_convergence_test_eps=1.e-2, min_iterations=0), core_params =
+                     scitbx.lbfgs.core_parameters(gtol=0.1), log=sys.stdout)
     self.a = self.x
   
   def compute_functional_and_gradients(self):
@@ -26,6 +26,7 @@ class lbfgs_helper():
 
   def target_func_and_grad(self):
     from scitbx.array_family import flex
+    import math
     coord_x = self.x[0:self.NN]
     coord_y = self.x[self.NN:2*self.NN]
     outer_coord_x = coord_x.matrix_outer_product(coord_x)
@@ -42,12 +43,17 @@ class lbfgs_helper():
     # Note that plotting should change since here we assume self.x is [x1,y1,x2,y2, .....]
     #grad = flex.double(self.n) 
     #result = 0.0
-    #for i in range(0,self.x.size(),2):
-      #for j in range(0,self.x.size(),2):
-      #  y_diff = 1-self.y_obs[(i//2)*(self.x.size()//2)+(j//2)]-self.x[i]*self.x[j]-self.x[i+1]*self.x[j+1]
-      #  grad[i] += -2*y_diff*self.x[j]
-      #  grad[i+1] += -2*y_diff*self.x[j+1]
-      #  result += y_diff*y_diff
+    #NN = self.x.size()//2
+    #for i in range(0,NN-1):
+    #  for j in range(i+1,NN):
+    #    dx = self.x[i]-self.x[j]
+    #    dy = self.x[i+NN]-self.x[j+NN]
+    #    d = math.sqrt(dx*dx+dy*dy)
+    #    y_diff = 1-self.y_obs[(i*NN)+(j)]-d
+    #    grad[i] += -2*y_diff*(self.x[i]-self.x[j])/d
+    #    grad[i+NN] += -2*y_diff*(self.x[i+NN]-self.x[j+NN])/d
+    #    #grad[i+NN] += -2*y_diff*self.x[j+1]
+    #    result += y_diff*y_diff
     #return result,grad
     # -------------- End original implementation ----------------------
 
@@ -116,7 +122,10 @@ def plot_with_dimensional_embedding(r, show_plot=True, use_lbfgs=True):
 
   if show_plot:
     import matplotlib.pyplot as plt
+    plt.figure(2)
     plt.scatter(xx,yy,c='g',marker='^')
+    #plt.xlim([-1,1])
+    #plt.ylim([-1,1])
     plt.show()
 
 def run_detail(show_plot, save_plot, use_dummy_data=False):
@@ -144,7 +153,7 @@ def run_detail(show_plot, save_plot, use_dummy_data=False):
         # http://matplotlib.org/faq/howto_faq.html#generate-images-without-having-a-window-appear
         matplotlib.use('Agg') # use a non-interactive backend
       from matplotlib import pyplot as plt
-      plt.figure()
+      plt.figure(1)
       plt.plot([c.uc[0] for c in cells],[c.uc[1] for c in cells],"k.", markersize=3.)
       plt.axes().set_aspect("equal")
       if save_plot:
@@ -187,17 +196,17 @@ def run_detail(show_plot, save_plot, use_dummy_data=False):
           Dij[i*len(xx)+j] = dij
       if show_plot:
         import matplotlib.pyplot as plt
-        plt.figure()
+        #plt.figure()
         plt.scatter(xx,yy)
         plt.show()
     else:
       Dij = NCDist_flatten(MM_double) # loop is flattened
-    plot_with_dimensional_embedding(1-(Dij/flex.max(Dij)), show_plot=show_plot)
+    plot_with_dimensional_embedding(Dij/flex.max(Dij), show_plot=show_plot)
 
 if __name__ == "__main__":
   '''
   Please provide a filename at the command line whose data is to be parsed.
   Example files are given in the exafel_project/ADSE13-25 itself
   '''
-  run_detail(show_plot=False, save_plot=False, use_dummy_data=False)
+  run_detail(show_plot=True, save_plot=False, use_dummy_data=False)
 

@@ -285,8 +285,9 @@ class Processor_iota(Processor):
               print('Indexing failed for some reason')
               #from IPython import embed; embed(); exit()
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
-            from consensus_functions import get_uc_consensus as get_consensus
-            self.known_crystal_models = [get_consensus(experiments_list, show_plot=False)]
+            from IPython import embed; embed(); exit()
+            from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get_consensus
+            self.known_crystal_models = [get_consensus(experiments_list, show_plot=True)]
             print ('Reindexing with best chosen crystal model')
             experiments, indexed = self.index(datablock, observed)
           print('fraction subsampled = ', self.params.iota.random_sub_sampling.fraction_sub_sample, len(indexed))
@@ -313,6 +314,71 @@ class Processor_iota(Processor):
       print("Error integrating", tag, str(e))
       if self.params.dispatch.squash_errors: raise
       return
+
+  def index(self, datablock, reflections):
+    from dials.algorithms.indexing.indexer import indexer_base
+    from time import time
+    import copy
+    st = time()
+
+    logger.info('*' * 80)
+    logger.info('Indexing Strong Spots')
+    logger.info('*' * 80)
+
+    imagesets = datablock.extract_imagesets()
+
+    params = copy.deepcopy(self.params)
+    # don't do scan-varying refinement during indexing
+    params.refinement.parameterisation.scan_varying = False
+
+    if hasattr(self, 'known_crystal_models'):
+      known_crystal_models = self.known_crystal_models
+    else:
+      known_crystal_models = None
+
+    if params.indexing.stills.method_list is None:
+      idxr = indexer_base.from_parameters(
+        reflections, imagesets, known_crystal_models=known_crystal_models,
+        params=params)
+      idxr.index()
+    else:
+      indexing_error = None
+      for method in params.indexing.stills.method_list:
+        params.indexing.method = method
+        try:
+          idxr = indexer_base.from_parameters(
+            reflections, imagesets,
+            params=params)
+          idxr.index()
+        except Exception as e:
+          logger.info("Couldn't index using method %s"%method)
+          if indexing_error is None:
+            if e is None:
+              e = Exception("Couldn't index using method %s"%method)
+            indexing_error = e
+        else:
+          indexing_error = None
+          break
+      if indexing_error is not None:
+        raise indexing_error
+
+    indexed = idxr.refined_reflections
+    experiments = idxr.refined_experiments
+
+    if known_crystal_models is not None:
+      from dials.array_family import flex
+      filtered = flex.reflection_table()
+      for idx in set(indexed['miller_index']):
+        sel = indexed['miller_index'] == idx
+        if sel.count(True) == 1:
+          filtered.extend(indexed.select(sel))
+      logger.info("Filtered duplicate reflections, %d out of %d remaining"%(len(filtered),len(indexed)))
+      print("Filtered duplicate reflections, %d out of %d remaining"%(len(filtered),len(indexed)))
+      indexed = filtered
+
+    logger.info('')
+    logger.info('Time Taken = %f seconds' % (time() - st))
+    return experiments, indexed
 
 
 if __name__ == '__main__':
