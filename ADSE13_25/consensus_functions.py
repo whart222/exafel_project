@@ -210,12 +210,12 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
     if True:
       from scitbx.matrix import sqr
       from cctbx_orientation_ext import crystal_orientation
-      crystal_orientation_list = []
-      for i in range(len(experiments_list)):
-        crystal_orientation_list.append(crystal_orientation(experiments_list[i].crystals()[0].get_A(), True))
+      #crystal_orientation_list = []
+      #for i in range(len(experiments_list)):
+      #  crystal_orientation_list.append(crystal_orientation(experiments_list[i].crystals()[0].get_A(), True))
         #from IPython import embed; embed(); exit() 
-        A_direct = sqr(crystal_orientation_list[i].reciprocal_matrix()).transpose().inverse()
-        print ("Direct A matrix 1st element = %12.6f"%A_direct[0])
+        #A_direct = sqr(crystal_orientation_list[i].reciprocal_matrix()).transpose().inverse()
+        #print ("Direct A matrix 1st element = %12.6f"%A_direct[0])
     for i in range(len(experiments_list)):
       if CM.cluster_id_full[i] not in uc_experiments_list:
         uc_experiments_list[CM.cluster_id_full[i]] = []
@@ -238,8 +238,14 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
     d_c_ori = 0.13
     from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding 
     #plot_with_dimensional_embedding(1-Dij_ori[1]/flex.max(Dij_ori[1]), show_plot=True)
+    dxtbx_crystal_models = []
     for cluster in Dij_ori:
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85)
+      n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
+      #from IPython import embed; embed()
+      for i in range(n_cluster_ori):
+        item = flex.first_index(CM_ori.cluster_id_maxima, i)
+        dxtbx_crystal_models.append(uc_experiments_list[cluster][item].crystals()[0])
       if show_plot:
         # Decision graph
         stretch_plot_factor = 1.05 # (1+fraction of limits by which xlim,ylim should be set)
@@ -252,7 +258,11 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
         plt.xlim([-10,stretch_plot_factor*flex.max(CM_ori.rho)])
         plt.ylim([-10,stretch_plot_factor*flex.max(CM_ori.delta)])
         plt.show()
-  from IPython import embed; embed(); exit()
+  #from IPython import embed; embed(); exit()
   # FIXME Still to be worked out what exactly should be returned 
-  return experiments_list[0].crystals()[0]
+  if len(dxtbx_crystal_models) > 0:
+    return dxtbx_crystal_models
+  else:
+    # If nothing works, atleast return the 1st crystal model that was found
+    return [experiments_list[0].crystals()[0]]
    

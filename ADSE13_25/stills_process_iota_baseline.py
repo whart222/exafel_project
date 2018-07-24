@@ -266,7 +266,6 @@ class Processor_iota(Processor):
       print("Error spotfinding", tag, str(e))
       if not self.params.dispatch.squash_errors: raise
       return
-    #from IPython import embed; embed(); exit()
     try:
       if self.params.dispatch.index:
         if self.params.iota.method == 'random_sub_sampling':
@@ -279,40 +278,38 @@ class Processor_iota(Processor):
             try:
               print ('SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']))
               experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
-              #from IPython import embed; embed(); exit() 
               experiments_list.append(experiments_tmp)
             except:
               print('Indexing failed for some reason')
-              #from IPython import embed; embed(); exit()
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
-            from IPython import embed; embed(); exit()
             from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get_consensus
-            self.known_crystal_models = [get_consensus(experiments_list, show_plot=True)]
-            print ('Reindexing with best chosen crystal model')
-            experiments, indexed = self.index(datablock, observed)
-          print('fraction subsampled = ', self.params.iota.random_sub_sampling.fraction_sub_sample, len(indexed))
+            known_crystal_models = get_consensus(experiments_list, show_plot=False)
+          self.known_crystal_models = known_crystal_models
+          print ('Reindexing with best chosen crystal model')
+          experiments, indexed = self.index(datablock, observed)
+          print('fraction subsampled = %5.2f with %d indexed spots ' %(self.params.iota.random_sub_sampling.fraction_sub_sample,len(indexed)))
+          try:
+            experiments,indexed = self.refine(experiments, indexed)
+          except Exception as e:
+            print("Error refining", tag, str(e))
+            if not self.params.dispatch.squash_errors: raise
+            return
+          try:
+            if self.params.dispatch.integrate:
+              integrated = self.integrate(experiments, indexed)
+            else:
+              print("Integration turned off. Exiting")
+              return
+          except Exception as e:
+            print("Error integrating", tag, str(e))
+            if self.params.dispatch.squash_errors: raise
+            return
       else:
-        print("Indexing turned off. Exiting")
+        print("IOTA based Indexing turned off. Exiting")
         return
     except Exception as e:
-      print("Couldnt index", tag, str(e))
+      print("Couldnt index using IOTA ", tag, str(e))
       if not self.params.dispatch.squash_errors: raise
-      return
-    try:
-      experiments,indexed = self.refine(experiments, indexed)
-    except Exception as e:
-      print("Error refining", tag, str(e))
-      if not self.params.dispatch.squash_errors: raise
-      return
-    try:
-      if self.params.dispatch.integrate:
-        integrated = self.integrate(experiments, indexed)
-      else:
-        print("Integration turned off. Exiting")
-        return
-    except Exception as e:
-      print("Error integrating", tag, str(e))
-      if self.params.dispatch.squash_errors: raise
       return
 
   def index(self, datablock, reflections):
