@@ -34,9 +34,9 @@ iota {
       .type = choice
       .help = choose the type of consensus function to be employed for random_sub_sampling. More details \
               in the functions themselves
-    ncandidates = 1
-      .type = int
-      .help = number of candidate basis vectors to consider
+    show_plot = False
+      .type = bool
+      .help = Flag to indicate whether plots for clustering are to be displayed. Useful for debugging
   }
 }
 '''
@@ -283,7 +283,7 @@ class Processor_iota(Processor):
               print('Indexing failed for some reason')
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
             from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get_consensus
-            known_crystal_models = get_consensus(experiments_list, show_plot=False)
+            known_crystal_models = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot)
           self.known_crystal_models = known_crystal_models
           print ('Reindexing with best chosen crystal model')
           experiments, indexed = self.index(datablock, observed)
