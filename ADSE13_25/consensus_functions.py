@@ -97,7 +97,7 @@ class clustering_manager(group_args):
     #      cluster_id.set_selected(too_sparse,-1)
     self.cluster_id_final = cluster_id.deep_copy()
 
-def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
+def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_only_first_indexed_model=False):
   '''
   Uses the Rodriguez Laio 2014 method to do a clustering of the unit cells and then vote for the highest
   consensus unit cell. Input needs to be a list of experiments object. 
@@ -140,10 +140,10 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
     import matplotlib
     if not show_plot:
       matplotlib.use('Agg')
-  import matplotlib.pyplot as plt
-  #from IPython import embed; embed(); exit()
-  plt.plot([c.uc[0] for c in cells],[c.uc[1] for c in cells],"k.", markersize=3.)
-  plt.axes().set_aspect("equal")
+    import matplotlib.pyplot as plt
+    #from IPython import embed; embed(); exit()
+    plt.plot([c.uc[0] for c in cells],[c.uc[1] for c in cells],"k.", markersize=3.)
+    plt.axes().set_aspect("equal")
   if save_plot:
     plot_name = 'uc_cluster.png'
     plt.savefig(plot_name,
@@ -197,7 +197,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
   # Now look at each unit cell cluster for orientational clustering
   # idea is to cluster the orientational component in each of the unit cell clusters
   #  
-  do_orientational_clustering = True
+  do_orientational_clustering = False
   #from IPython import embed; embed(); exit()
   if do_orientational_clustering:
     Dij_ori = {} # dictionary to store Dij for each cluster
@@ -260,6 +260,8 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False):
         plt.show()
   #from IPython import embed; embed(); exit()
   # FIXME Still to be worked out what exactly should be returned 
+  if return_only_first_indexed_model:
+    return [experiments_list[0].crystals()[0]]
   if len(dxtbx_crystal_models) > 0:
     return dxtbx_crystal_models
   else:
