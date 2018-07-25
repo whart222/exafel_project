@@ -252,7 +252,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         from cctbx_orientation_ext import crystal_orientation
         crystal_orientation = crystal_orientation(dxtbx_crystal_model.get_A(), True)
         A_direct = sqr(crystal_orientation.reciprocal_matrix()).transpose().inverse()
-        print ("IOTA: Direct A matrix 1st element of orientational cluster %d  = %12.6f"%(%i,A_direct[0]))
+        print ("IOTA: Direct A matrix 1st element of orientational cluster %d  = %12.6f"%(i,A_direct[0]))
       if show_plot:
         # Decision graph
         stretch_plot_factor = 1.05 # (1+fraction of limits by which xlim,ylim should be set)

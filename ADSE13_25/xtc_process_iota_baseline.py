@@ -1213,7 +1213,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
           flex.set_random_seed(trial+1001)
           observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
           try:
-            print('IOTA:SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']))
+            print('IOTA:SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']),' ', trial)
             experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
             experiments_list.append(experiments_tmp)
           except:
