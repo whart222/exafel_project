@@ -124,7 +124,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       cells.append(CellOnlyFrame(crystal_symmetry))
   else:
     for experiment in experiments_list:
-      assert len(experiment.crystals()) == 1, 'Should have only one crystal model'
+      if len(experiment.crystals()) >1: print ('IOTA:Should have only one crystal model')
       crystal_symmetry = experiment.crystals()[0].get_crystal_symmetry()
       cells.append(CellOnlyFrame(crystal_symmetry))
   MM = [c.mm for c in cells] # metrical matrices
@@ -152,7 +152,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
                 bbox_inches='tight')
   if show_plot:
     plt.show()
-  print ('Now constructing a Dij matrix')
+  print ('Now constructing a Dij matrix: Starting Unit Cell clustering')
   NN = len(MM)
   from cctbx.uctbx.determine_unit_cell import NCDist_flatten
   Dij = NCDist_flatten(MM_double) 
@@ -197,9 +197,11 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   # Now look at each unit cell cluster for orientational clustering
   # idea is to cluster the orientational component in each of the unit cell clusters
   #  
-  do_orientational_clustering = False
+  do_orientational_clustering = not return_only_first_indexed_model # temporary. 
+  dxtbx_crystal_models = []
   #from IPython import embed; embed(); exit()
   if do_orientational_clustering:
+    print ('IOTA: Starting orientational clustering')
     Dij_ori = {} # dictionary to store Dij for each cluster
     uc_experiments_list = {} # dictionary to store experiments_lists for each cluster
     from collections import Counter
@@ -238,14 +240,19 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
     d_c_ori = 0.13
     from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding 
     #plot_with_dimensional_embedding(1-Dij_ori[1]/flex.max(Dij_ori[1]), show_plot=True)
-    dxtbx_crystal_models = []
     for cluster in Dij_ori:
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85)
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       #from IPython import embed; embed()
       for i in range(n_cluster_ori):
         item = flex.first_index(CM_ori.cluster_id_maxima, i)
-        dxtbx_crystal_models.append(uc_experiments_list[cluster][item].crystals()[0])
+        dxtbx_crystal_model = uc_experiments_list[cluster][item].crystals()[0]
+        dxtbx_crystal_models.append(dxtbx_crystal_model)
+        from scitbx.matrix import sqr
+        from cctbx_orientation_ext import crystal_orientation
+        crystal_orientation = crystal_orientation(dxtbx_crystal_model.get_A(), True)
+        A_direct = sqr(crystal_orientation.reciprocal_matrix()).transpose().inverse()
+        print ("IOTA: Direct A matrix 1st element of orientational cluster %d  = %12.6f"%(%i,A_direct[0]))
       if show_plot:
         # Decision graph
         stretch_plot_factor = 1.05 # (1+fraction of limits by which xlim,ylim should be set)

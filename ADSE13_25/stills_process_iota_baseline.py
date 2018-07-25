@@ -37,6 +37,11 @@ iota {
     show_plot = False
       .type = bool
       .help = Flag to indicate whether plots for clustering are to be displayed. Useful for debugging
+    no_outlier_rejection_and_candidates_refinement=False
+      .type = bool
+      .help = Flag to indicate if candidate basis vectors should be refined and whether \
+              outlier rejectionis needed
+
   }
 }
 '''
@@ -272,20 +277,29 @@ class Processor_iota(Processor):
           from scitbx.array_family import flex
           len_max_indexed = -999
           experiments_list = []
+          # No outlier rejection or refinement should be done for the candidate basis vectors
+          outlier_rejection_flag=self.params.indexing.stills.candidate_outlier_rejection
+          refine_all_candidates_flag=self.params.indexing.stills.refine_all_candidates
+          if self.params.iota.random_sub_sampling.no_outlier_rejection_and_candidates_refinement:
+            self.params.indexing.stills.candidate_outlier_rejection=False
+            self.params.indexing.stills.refine_all_candidates=False
           for trial in range(self.params.iota.random_sub_sampling.ntrials):
             flex.set_random_seed(trial+1001)
             observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
             try:
-              print ('SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']))
+              print ('IOTA: SUM_INTENSITY_VALUE',sum(observed_sample['intensity.sum.value']), ' ',trial)
               experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
               experiments_list.append(experiments_tmp)
             except:
               print('Indexing failed for some reason')
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
             from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get_consensus
-            known_crystal_models = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot)
+            known_crystal_models = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=True)
           self.known_crystal_models = known_crystal_models
-          print ('Reindexing with best chosen crystal model')
+          print ('IOTA: Reindexing with best chosen crystal model')
+          # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
+          self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
+          self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
           experiments, indexed = self.index(datablock, observed)
           print('fraction subsampled = %5.2f with %d indexed spots ' %(self.params.iota.random_sub_sampling.fraction_sub_sample,len(indexed)))
           try:
