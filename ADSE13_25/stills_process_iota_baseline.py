@@ -41,6 +41,18 @@ iota {
       .type = bool
       .help = Flag to indicate if candidate basis vectors should be refined and whether \
               outlier rejectionis needed
+    finalize_method = union_and_reindex *reindex_with_known_crystal_models
+      .type = choice
+      .help = union_and_reindex will take union of all spots used to obtain \
+              cluster (hence lattice) and then reindex with all the lattice models \
+              of that cluster.\
+              reindex_with_known_crystal_models will just index the spots with \
+              known_orientation_indexer. Useful if clustering fails but indexing \
+              succeeds in limited trials
+    Z_cutoff = 1.0
+      .type = float
+      .help = Z-score cutoff for accepting/rejecting bragg spots based on difference between \
+              fractional and integer hkl. This will be used for finalize_method = union_and_reindex
 
   }
 }
@@ -277,32 +289,125 @@ class Processor_iota(Processor):
           from scitbx.array_family import flex
           len_max_indexed = -999
           experiments_list = []
+          # Add an id for each strong spot observed in the image
+          observed['spot_id'] = flex.size_t(range(len(observed)))
           # No outlier rejection or refinement should be done for the candidate basis vectors
           outlier_rejection_flag=self.params.indexing.stills.candidate_outlier_rejection
           refine_all_candidates_flag=self.params.indexing.stills.refine_all_candidates
           if self.params.iota.random_sub_sampling.no_outlier_rejection_and_candidates_refinement:
             self.params.indexing.stills.candidate_outlier_rejection=False
             self.params.indexing.stills.refine_all_candidates=False
+
+          observed_samples_list = []
           for trial in range(self.params.iota.random_sub_sampling.ntrials):
             flex.set_random_seed(trial+1001)
             observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
             try:
               print ('IOTA: SUM_INTENSITY_VALUE',sum(observed_sample['intensity.sum.value']), ' ',trial)
               experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
+              #from IPython import embed; embed()
+              #exit()
               experiments_list.append(experiments_tmp)
+              observed_samples_list.append(observed_sample)
             except:
               print('Indexing failed for some reason')
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
             from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get_consensus
-            known_crystal_models = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=True)
-          self.known_crystal_models = known_crystal_models
-          print ('IOTA: Reindexing with best chosen crystal model')
-          # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
-          self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
-          self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
-          experiments, indexed = self.index(datablock, observed)
-          print('fraction subsampled = %5.2f with %d indexed spots ' %(self.params.iota.random_sub_sampling.fraction_sub_sample,len(indexed)))
+            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method)
+          print ('IOTA: Finalizing consensus')
+          if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
+            print ('IOTA: Chosen finalize method is reindex_with_known_crystal_models')
+            self.known_crystal_models = known_crystal_models
+            # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
+            self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
+            self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
+            experiments, indexed = self.index(datablock, observed)
+            print('fraction subsampled = %5.2f with %d indexed spots ' %(self.params.iota.random_sub_sampling.fraction_sub_sample,len(indexed)))
+
+          elif self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
+            print ('IOTA: Chosen finalize method is union_and_reindex')
+            # Take union of all spots used to index each lattice cluster
+            from dials.array_family import flex as dials_flex
+            from dxtbx.model.experiment_list import ExperimentList
+            indexed = dials_flex.reflection_table()
+            experiments = ExperimentList()
+            sample = {} 
+            all_experimental_models = {}
+            for idx,crystal_model in enumerate(clustered_experiments_list):
+              if crystal_model >= 0:
+                if crystal_model not in sample:
+                  sample[crystal_model] = []
+                  all_experimental_models[crystal_model] = []
+                sample[crystal_model].append(observed_samples_list[idx]['spot_id'])
+                all_experimental_models[crystal_model].append(experiments_list[idx])
+            for crystal_model in sample: 
+              self.known_crystal_models = None
+              union_indices=flex.union(len(observed), iselections=sample[crystal_model])
+              union_observed = observed.select(union_indices)
+              print ('done taking unions')
+              # First index the union set with the central crystal model of the cluster
+              #import pdb; pdb.set_trace()
+              self.known_crystal_models = [known_crystal_models[crystal_model]]
+              experiments_mean, indexed_mean = self.index(datablock, union_observed)
+              indexed_mean['id'].set_selected(flex.size_t(range(len(indexed_mean))), crystal_model)
+              # Now index with each each experimental model for each of the unioned observations
+              dh_list = flex.double()
+              failed_model_counter = 0
+              for obs in all_experimental_models[crystal_model]:
+                try:
+                  self.known_crystal_models = [obs.crystals()[0]]
+                  experiments_tmp, indexed_tmp = self.index(datablock,union_observed) 
+                  #from IPython import embed; embed()
+                  #exit()
+                  # find dh = |h_frac - h_mean|
+                  indexed_idxlist = [idx for idx,elem in enumerate(indexed_tmp['xyzobs.mm.value']) 
+                                     if elem in indexed_mean['xyzobs.mm.value']]
+                  dh_list_tmp = flex.double()
+                  for idx in indexed_idxlist:
+                    mean_list_idx = list(indexed_mean['xyzobs.mm.value']).index(indexed_tmp['xyzobs.mm.value'][idx])
+                    x = indexed_mean['miller_index'][mean_list_idx]
+                    y = indexed_tmp['fractional_miller_index'][idx]
+                    dh = flex.double((x[0]-y[0],x[1]-y[1],x[2]-y[2])).norm()
+                    # Dont want to pollute dh_list with absolutely wrong predictions !
+                    # Might want to adjust this threshold
+                    #if abs(dh) > 0.5:
+                      #continue
+                    dh_list_tmp.append(dh)
+                  if max(dh_list_tmp) > 0.5:
+                    failed_model_counter +=1
+                    continue
+                  dh_list.extend(dh_list_tmp)
+                  #dh_list.extend([flex.double((x[0]-y[0],x[1]-y[1],x[2]-y[2])).norm() for x,y in zip(list(indexed_tmp['fractional_miller_index']),list(indexed_mean['miller_index']))])
+                except Exception as e:
+                  print ('Reindexing with candidate lattices on union set failed')  
+              # Get a sense of the variability in dh. Assign Z-score cutoff from there
+              dh_mean_and_variance = flex.mean_and_variance(dh_list)
+              dh_mean = dh_mean_and_variance.mean()
+              dh_stdev = dh_mean_and_variance.unweighted_sample_standard_deviation()
+              Z_cutoff = self.params.iota.random_sub_sampling.Z_cutoff
+              # Make sure cutoff is less than 0.5, else set it to 0.5
+              dh_cutoff = min(dh_mean+Z_cutoff*dh_stdev, 0.5)
+              # Now go through the spots indexed by the cluster center and reject if dh greater than Z_cutoff
+              indexed_spots_idx = []
+              for ii,refl in enumerate(indexed_mean):
+                dh = flex.double([refl['miller_index'][0]-refl['fractional_miller_index'][0],
+                              refl['miller_index'][1]-refl['fractional_miller_index'][1],
+                              refl['miller_index'][2]-refl['fractional_miller_index'][2]]).norm()
+                if dh < dh_cutoff:
+                  indexed_spots_idx.append(ii)
+              indexed.extend(indexed_mean.select(flex.size_t(indexed_spots_idx)))
+              # Need to append properly
+              for expt in experiments_mean:
+                experiments.append(expt)
+            #experiments.append(experiments_mean)
+            #from IPython import embed; embed()
+            
+            # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
+            self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
+            self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
           try:
+            #from IPython import embed; embed()
+            #exit()
             experiments,indexed = self.refine(experiments, indexed)
           except Exception as e:
             print("Error refining", tag, str(e))
@@ -373,6 +478,7 @@ class Processor_iota(Processor):
       if indexing_error is not None:
         raise indexing_error
 
+#    from IPython import embed; embed()
     indexed = idxr.refined_reflections
     experiments = idxr.refined_experiments
 
