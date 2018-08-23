@@ -304,9 +304,11 @@ class Processor_iota(Processor):
             observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
             try:
               print ('IOTA: SUM_INTENSITY_VALUE',sum(observed_sample['intensity.sum.value']), ' ',trial)
-              experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
-              #from IPython import embed; embed()
-              #exit()
+              if self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
+                experiments_tmp, indexed_tmp = self.index_with_iota(datablock, observed_sample)
+              elif self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
+                experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
+
               experiments_list.append(experiments_tmp)
               observed_samples_list.append(observed_sample)
             except:
@@ -328,9 +330,10 @@ class Processor_iota(Processor):
             print ('IOTA: Chosen finalize method is union_and_reindex')
             # Take union of all spots used to index each lattice cluster
             from dials.array_family import flex as dials_flex
-            from dxtbx.model.experiment_list import ExperimentList
+            from dxtbx.model.experiment_list import ExperimentList, Experiment
             indexed = dials_flex.reflection_table()
             experiments = ExperimentList()
+            explist = ExperimentList()
             sample = {} 
             all_experimental_models = {}
             for idx,crystal_model in enumerate(clustered_experiments_list):
@@ -341,24 +344,55 @@ class Processor_iota(Processor):
                 sample[crystal_model].append(observed_samples_list[idx]['spot_id'])
                 all_experimental_models[crystal_model].append(experiments_list[idx])
             for crystal_model in sample: 
+              # Need to have a minimum number of experiments for correct stats
+              # FIXME number should not be hardcoded. ideally a phil param
+              if len(all_experimental_models[crystal_model]) < 3: continue
               self.known_crystal_models = None
               union_indices=flex.union(len(observed), iselections=sample[crystal_model])
               union_observed = observed.select(union_indices)
               print ('done taking unions')
               # First index the union set with the central crystal model of the cluster
               #import pdb; pdb.set_trace()
-              self.known_crystal_models = [known_crystal_models[crystal_model]]
-              experiments_mean, indexed_mean = self.index(datablock, union_observed)
+              self.known_crystal_models = None #[known_crystal_models[crystal_model]]
+              from cctbx import crystal
+              imagesets = datablock.extract_imagesets()
+              for imageset in imagesets:
+                exp = Experiment(imageset=imageset, 
+                                 beam=imageset.get_beam(),
+                                 detector=imageset.get_detector(), 
+                                 goniometer=imageset.get_goniometer(),
+                                 scan=imageset.get_scan(),
+                                 crystal=known_crystal_models[crystal_model])
+                explist.append(exp)
+              from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
+              reidxr = iota_indexer(union_observed, imagesets,params=self.params)
+              reidxr.index(provided_experiments=explist)
+              experiments_mean = reidxr.experiments
+              indexed_mean = reidxr.reflections
+              #from IPython import embed; embed(); exit()
+              #import pdb; pdb.set_trace() 
+              #experiments_mean, indexed_mean = self.index_with_iota(datablock, union_observed)
               indexed_mean['id'].set_selected(flex.size_t(range(len(indexed_mean))), crystal_model)
               # Now index with each each experimental model for each of the unioned observations
               dh_list = flex.double()
               failed_model_counter = 0
               for obs in all_experimental_models[crystal_model]:
                 try:
-                  self.known_crystal_models = [obs.crystals()[0]]
-                  experiments_tmp, indexed_tmp = self.index(datablock,union_observed) 
-                  #from IPython import embed; embed()
-                  #exit()
+                  explist = ExperimentList()
+                  self.known_crystal_models = None #[obs.crystals()[0]]
+                  exp = Experiment(imageset=imageset,
+                                   beam=imageset.get_beam(),
+                                   detector=imageset.get_detector(),
+                                   goniometer=imageset.get_goniometer(),
+                                   scan=imageset.get_scan(),
+                                   crystal=obs.crystals()[0])
+                  explist.append(exp)
+                  reidxr = iota_indexer(union_observed, imagesets,params=self.params)
+                  reidxr.index(provided_experiments=explist)
+                  experiments_tmp = reidxr.experiments
+                  indexed_tmp = reidxr.reflections
+                  #experiments_tmp, indexed_tmp = self.index_with_iota(datablock,union_observed) 
+
                   # find dh = |h_frac - h_mean|
                   indexed_idxlist = [idx for idx,elem in enumerate(indexed_tmp['xyzobs.mm.value']) 
                                      if elem in indexed_mean['xyzobs.mm.value']]
@@ -368,10 +402,8 @@ class Processor_iota(Processor):
                     x = indexed_mean['miller_index'][mean_list_idx]
                     y = indexed_tmp['fractional_miller_index'][idx]
                     dh = flex.double((x[0]-y[0],x[1]-y[1],x[2]-y[2])).norm()
-                    # Dont want to pollute dh_list with absolutely wrong predictions !
-                    # Might want to adjust this threshold
-                    #if abs(dh) > 0.5:
-                      #continue
+                    if x == (0,0,0): continue
+
                     dh_list_tmp.append(dh)
                   if max(dh_list_tmp) > 0.5:
                     failed_model_counter +=1
@@ -381,26 +413,31 @@ class Processor_iota(Processor):
                 except Exception as e:
                   print ('Reindexing with candidate lattices on union set failed')  
               # Get a sense of the variability in dh. Assign Z-score cutoff from there
-              dh_mean_and_variance = flex.mean_and_variance(dh_list)
-              dh_mean = dh_mean_and_variance.mean()
-              dh_stdev = dh_mean_and_variance.unweighted_sample_standard_deviation()
-              Z_cutoff = self.params.iota.random_sub_sampling.Z_cutoff
-              # Make sure cutoff is less than 0.5, else set it to 0.5
-              dh_cutoff = min(dh_mean+Z_cutoff*dh_stdev, 0.5)
-              # Now go through the spots indexed by the cluster center and reject if dh greater than Z_cutoff
-              indexed_spots_idx = []
-              for ii,refl in enumerate(indexed_mean):
-                dh = flex.double([refl['miller_index'][0]-refl['fractional_miller_index'][0],
-                              refl['miller_index'][1]-refl['fractional_miller_index'][1],
-                              refl['miller_index'][2]-refl['fractional_miller_index'][2]]).norm()
-                if dh < dh_cutoff:
-                  indexed_spots_idx.append(ii)
-              indexed.extend(indexed_mean.select(flex.size_t(indexed_spots_idx)))
-              # Need to append properly
-              for expt in experiments_mean:
-                experiments.append(expt)
+              # try
+              try:
+                dh_mean_and_variance = flex.mean_and_variance(dh_list)
+                dh_mean = dh_mean_and_variance.mean()
+                dh_stdev = dh_mean_and_variance.unweighted_sample_standard_deviation()
+                Z_cutoff = self.params.iota.random_sub_sampling.Z_cutoff
+                # Make sure cutoff is less than 0.5, else set it to 0.5
+                dh_cutoff = min(dh_mean+Z_cutoff*dh_stdev, 0.5)
+                print ('dh_cutoff = ',dh_cutoff)
+                # Now go through the spots indexed by the cluster center and reject if dh greater than Z_cutoff
+                indexed_spots_idx = []
+                for ii,refl in enumerate(indexed_mean):
+                  dh = flex.double([refl['miller_index'][0]-refl['fractional_miller_index'][0],
+                                refl['miller_index'][1]-refl['fractional_miller_index'][1],
+                                refl['miller_index'][2]-refl['fractional_miller_index'][2]]).norm()
+                  if dh < dh_cutoff and refl['miller_index'] != (0,0,0):
+                    indexed_spots_idx.append(ii)
+                indexed.extend(indexed_mean.select(flex.size_t(indexed_spots_idx)))
+                # Need to append properly
+                for expt in experiments_mean:
+                  experiments.append(expt)
+              except:
+                print ('dh_list calculation and outlier rejection failed')
             #experiments.append(experiments_mean)
-            #from IPython import embed; embed()
+#            from IPython import embed; embed()
             
             # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
             self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
@@ -408,6 +445,7 @@ class Processor_iota(Processor):
           try:
             #from IPython import embed; embed()
             #exit()
+            #indexed['fractional_miller_index'] = indexed['miller_index']
             experiments,indexed = self.refine(experiments, indexed)
           except Exception as e:
             print("Error refining", tag, str(e))
@@ -478,9 +516,75 @@ class Processor_iota(Processor):
       if indexing_error is not None:
         raise indexing_error
 
-#    from IPython import embed; embed()
     indexed = idxr.refined_reflections
     experiments = idxr.refined_experiments
+
+    if known_crystal_models is not None:
+      from dials.array_family import flex
+      filtered = flex.reflection_table()
+      for idx in set(indexed['miller_index']):
+        sel = indexed['miller_index'] == idx
+        if sel.count(True) == 1:
+          filtered.extend(indexed.select(sel))
+      logger.info("Filtered duplicate reflections, %d out of %d remaining"%(len(filtered),len(indexed)))
+      print("Filtered duplicate reflections, %d out of %d remaining"%(len(filtered),len(indexed)))
+      indexed = filtered
+
+    logger.info('')
+    logger.info('Time Taken = %f seconds' % (time() - st))
+    return experiments, indexed
+
+
+  def index_with_iota(self, datablock, reflections):
+    from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
+    from time import time
+    import copy
+    st = time()
+
+    logger.info('*' * 80)
+    logger.info('Indexing Strong Spots')
+    logger.info('*' * 80)
+
+    imagesets = datablock.extract_imagesets()
+
+    params = copy.deepcopy(self.params)
+    # don't do scan-varying refinement during indexing
+    params.refinement.parameterisation.scan_varying = False
+
+    if hasattr(self, 'known_crystal_models'):
+      known_crystal_models = self.known_crystal_models
+    else:
+      known_crystal_models = None
+
+    if params.indexing.stills.method_list is None:
+      idxr = iota_indexer.from_parameters(
+        reflections, imagesets, known_crystal_models=known_crystal_models,
+        params=params)
+      idxr.index()
+    else:
+      indexing_error = None
+      for method in params.indexing.stills.method_list:
+        params.indexing.method = method
+        try:
+          idxr = iota_indexer.from_parameters(
+            reflections, imagesets,
+            params=params)
+          idxr.index()
+        except Exception as e:
+          logger.info("Couldn't index using method %s"%method)
+          if indexing_error is None:
+            if e is None:
+              e = Exception("Couldn't index using method %s"%method)
+            indexing_error = e
+        else:
+          indexing_error = None
+          break
+      if indexing_error is not None:
+        raise indexing_error
+
+#    from IPython import embed; embed()
+    indexed = idxr.reflections
+    experiments = idxr.experiments
 
     if known_crystal_models is not None:
       from dials.array_family import flex
