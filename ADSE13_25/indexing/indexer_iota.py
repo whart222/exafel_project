@@ -136,7 +136,7 @@ class iota_indexer(stills_indexer):
       idxr = iota_indexer_real_space_grid_search(reflections, imagesets, params=params)
     return idxr
 
-  def index(self, provided_experiments=None):
+  def index(self, provided_experiments=None,debug=False):
     ''' This step does  1. find_lattices (via a method like fft1d) 
                         2. Assign hkl indices (through index_reflections)
                         3. Housekeeping like apply_symmetry, discard too similar models 
@@ -161,7 +161,7 @@ class iota_indexer(stills_indexer):
     self.reflections['id'] = flex.int(len(self.reflections), -1)
 
     # Now index reflections
-    self.index_reflections(experiments, self.reflections, debug=provided_experiments is not None)
+    self.index_reflections(experiments, self.reflections, debug=debug)
 
     # Housekeeping. Apply symmetry
     target_space_group = self.target_symmetry_primitive.space_group()
@@ -199,8 +199,6 @@ class iota_indexer(stills_indexer):
           from scitbx.matrix import sqr
           hklfrac=flex.mat3_double(len(miller_indices), sqr(cryst.get_A()).inverse())*self.reflections['rlp'].select(self.reflections['id']==i_expt)
           self.reflections['fractional_miller_index'].set_selected(self.reflections['id']==i_expt, hklfrac)
-#          if provided_experiments is not None:
-#            from IPython import embed; embed(); exit()
           
     # Discard nearly overlapping lattices
 
@@ -288,6 +286,24 @@ class iota_indexer(stills_indexer):
       reflections.set_flags(
         reflections['miller_index'] != (0,0,0), reflections.flags.indexed)
       reflections['id'].set_selected(reflections['miller_index'] == (0,0,0), -1)
+
+  def calculate_fractional_hkl_from_Ainverse_q(self, reflections, experiments,debug=False):
+    ''' Calculate hkl_frac = A^-1*q. Will also calculate the integer hkl values '''
+    assert len(experiments.crystals()) == 1, 'Should have only one crystal model'
+    #self.map_centroids_to_reciprocal_space(observed, )
+    from scitbx.matrix import sqr
+    Ainverse = flex.mat3_double(len(reflections), sqr(experiments.crystals()[0].get_A()).inverse())
+    q = reflections['rlp']
+    hkl_frac = Ainverse*q
+    hkl = hkl_frac.iround() 
+    reflections['miller_index'] = flex.miller_index(len(reflections),(0,0,0))
+    reflections['fractional_miller_index'] = flex.vec3_double(len(reflections),(0.0,0.0,0.0))
+    reflections['miller_index'] = flex.miller_index(list(hkl))
+    reflections['fractional_miller_index'] = hkl_frac
+    reflections.set_flags(reflections['miller_index'] != (0,0,0), reflections.flags.indexed)
+    
+    
+
 
 class iota_indexer_fft1d(iota_indexer, indexer_fft1d):
   '''Mixin class with fft1d and iota_indexer way of identifying indexing solutions'''

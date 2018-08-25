@@ -333,7 +333,6 @@ class Processor_iota(Processor):
             from dxtbx.model.experiment_list import ExperimentList, Experiment
             indexed = dials_flex.reflection_table()
             experiments = ExperimentList()
-            explist = ExperimentList()
             sample = {} 
             all_experimental_models = {}
             for idx,crystal_model in enumerate(clustered_experiments_list):
@@ -346,33 +345,33 @@ class Processor_iota(Processor):
             for crystal_model in sample: 
               # Need to have a minimum number of experiments for correct stats
               # FIXME number should not be hardcoded. ideally a phil param
-              if len(all_experimental_models[crystal_model]) < 3: continue
+              if len(all_experimental_models[crystal_model]) < 3: 
+                continue
               self.known_crystal_models = None
               union_indices=flex.union(len(observed), iselections=sample[crystal_model])
               union_observed = observed.select(union_indices)
               print ('done taking unions')
               # First index the union set with the central crystal model of the cluster
-              #import pdb; pdb.set_trace()
               self.known_crystal_models = None #[known_crystal_models[crystal_model]]
               from cctbx import crystal
               imagesets = datablock.extract_imagesets()
-              for imageset in imagesets:
+              explist_mean = ExperimentList()
+              for i,imageset in enumerate(imagesets):
                 exp = Experiment(imageset=imageset, 
                                  beam=imageset.get_beam(),
                                  detector=imageset.get_detector(), 
                                  goniometer=imageset.get_goniometer(),
                                  scan=imageset.get_scan(),
                                  crystal=known_crystal_models[crystal_model])
-                explist.append(exp)
+                explist_mean.append(exp)
+
               from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
               reidxr = iota_indexer(union_observed, imagesets,params=self.params)
-              reidxr.index(provided_experiments=explist)
-              experiments_mean = reidxr.experiments
+              reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist_mean)
+              experiments_mean = explist_mean
               indexed_mean = reidxr.reflections
-              #from IPython import embed; embed(); exit()
-              #import pdb; pdb.set_trace() 
-              #experiments_mean, indexed_mean = self.index_with_iota(datablock, union_observed)
               indexed_mean['id'].set_selected(flex.size_t(range(len(indexed_mean))), crystal_model)
+              print ('finished evaluating mean indexing results for crystal model ',crystal_model)
               # Now index with each each experimental model for each of the unioned observations
               dh_list = flex.double()
               failed_model_counter = 0
@@ -380,6 +379,18 @@ class Processor_iota(Processor):
                 try:
                   explist = ExperimentList()
                   self.known_crystal_models = None #[obs.crystals()[0]]
+
+                  # Make sure the crystal is rotated using the best_similarity_transformation
+                  # with respect to the mean model. Otherwise dh values will be junk
+                  from cctbx_orientation_ext import crystal_orientation
+                  cryst_ref_ori = crystal_orientation(explist_mean.crystals()[0].get_A(), True)
+                  cryst_tmp_ori = crystal_orientation(obs.crystals()[0].get_A(), True)
+                  best_similarity_transform = cryst_tmp_ori.best_similarity_transformation(
+                    other = cryst_ref_ori, fractional_length_tolerance = 10.00,
+                    unimodular_generator_range=1)
+                  cryst_tmp_ori_best=cryst_tmp_ori.change_basis(best_similarity_transform)
+                  obs.crystals()[0].set_A(cryst_tmp_ori_best.reciprocal_matrix())
+
                   exp = Experiment(imageset=imageset,
                                    beam=imageset.get_beam(),
                                    detector=imageset.get_detector(),
@@ -388,10 +399,9 @@ class Processor_iota(Processor):
                                    crystal=obs.crystals()[0])
                   explist.append(exp)
                   reidxr = iota_indexer(union_observed, imagesets,params=self.params)
-                  reidxr.index(provided_experiments=explist)
-                  experiments_tmp = reidxr.experiments
+                  reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist)
+                  experiments_tmp = explist
                   indexed_tmp = reidxr.reflections
-                  #experiments_tmp, indexed_tmp = self.index_with_iota(datablock,union_observed) 
 
                   # find dh = |h_frac - h_mean|
                   indexed_idxlist = [idx for idx,elem in enumerate(indexed_tmp['xyzobs.mm.value']) 
@@ -405,11 +415,8 @@ class Processor_iota(Processor):
                     if x == (0,0,0): continue
 
                     dh_list_tmp.append(dh)
-                  if max(dh_list_tmp) > 0.5:
-                    failed_model_counter +=1
-                    continue
                   dh_list.extend(dh_list_tmp)
-                  #dh_list.extend([flex.double((x[0]-y[0],x[1]-y[1],x[2]-y[2])).norm() for x,y in zip(list(indexed_tmp['fractional_miller_index']),list(indexed_mean['miller_index']))])
+                  print ('finished evaluating dh_list for crystal model ',crystal_model)
                 except Exception as e:
                   print ('Reindexing with candidate lattices on union set failed')  
               # Get a sense of the variability in dh. Assign Z-score cutoff from there
@@ -419,8 +426,10 @@ class Processor_iota(Processor):
                 dh_mean = dh_mean_and_variance.mean()
                 dh_stdev = dh_mean_and_variance.unweighted_sample_standard_deviation()
                 Z_cutoff = self.params.iota.random_sub_sampling.Z_cutoff
+                # FIXME this part needs some though. What metric to use ?
                 # Make sure cutoff is less than 0.5, else set it to 0.5
-                dh_cutoff = min(dh_mean+Z_cutoff*dh_stdev, 0.5)
+                #dh_cutoff = min(dh_mean+Z_cutoff*dh_stdev, 0.3)
+                dh_cutoff = flex.median(dh_list)
                 print ('dh_cutoff = ',dh_cutoff)
                 # Now go through the spots indexed by the cluster center and reject if dh greater than Z_cutoff
                 indexed_spots_idx = []
@@ -432,20 +441,28 @@ class Processor_iota(Processor):
                     indexed_spots_idx.append(ii)
                 indexed.extend(indexed_mean.select(flex.size_t(indexed_spots_idx)))
                 # Need to append properly
-                for expt in experiments_mean:
+                for iexpt,expt in enumerate(experiments_mean):
+                  print ('APPENDING EXPERIMENT = ',crystal_model,iexpt)
                   experiments.append(expt)
+
               except:
                 print ('dh_list calculation and outlier rejection failed')
-            #experiments.append(experiments_mean)
-#            from IPython import embed; embed()
-            
+
+            # Make sure crytal model numbers are in sequence, example 0,1,2 instead of 0,2,3 
+            # when model 1 was not used for consensus part. Otherwise refine won't work
+            max_id = flex.max(indexed['id'])
+            original_ids = []
+            for iid in range(0,max_id+1):
+              if len(indexed.select(indexed['id']==iid)) != 0:
+                original_ids.append(iid)
+
+            for ii,iid in enumerate(original_ids):
+              indexed['id'].set_selected(indexed['id'] == iid,ii)
             # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
             self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
             self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
+
           try:
-            #from IPython import embed; embed()
-            #exit()
-            #indexed['fractional_miller_index'] = indexed['miller_index']
             experiments,indexed = self.refine(experiments, indexed)
           except Exception as e:
             print("Error refining", tag, str(e))
@@ -582,7 +599,6 @@ class Processor_iota(Processor):
       if indexing_error is not None:
         raise indexing_error
 
-#    from IPython import embed; embed()
     indexed = idxr.reflections
     experiments = idxr.experiments
 
