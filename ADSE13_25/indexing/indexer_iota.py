@@ -1,6 +1,5 @@
 from __future__ import absolute_import, division
 from __future__ import print_function
-import math
 import logging
 logger = logging.getLogger(__name__)
 
@@ -19,20 +18,20 @@ from dials.algorithms.indexing.fft3d import indexer_fft3d
 from dials.algorithms.indexing.fft1d import indexer_fft1d
 from dials_algorithms_indexing_ext import *
 
-import iotbx.phil
+import iotbx.phil # implicit import
 from scitbx import matrix
 
 from dials.array_family import flex
-from cctbx import crystal, sgtbx, xray
+from cctbx import crystal
 
 from dxtbx.model import Crystal
-from dxtbx.model.experiment_list import Experiment, ExperimentList
+from dxtbx.model.experiment_list import ExperimentList
 
-from dials.algorithms.indexing.indexer import max_cell_phil_str, index_only_phil_str,master_params 
+from dials.algorithms.indexing.indexer import master_params
 from dials.algorithms.indexing.stills_indexer import stills_indexer
 
 class iota_indexer(stills_indexer):
- 
+
   def __init__(self, reflections, imagesets, params=None):
     '''Init function for iota_indexer is different from indexer_base in that
        _setup_symmetry function is not called. All features only work for stills'''
@@ -48,7 +47,7 @@ class iota_indexer(stills_indexer):
     self.all_params = params
     self.refined_experiments = None
     self.hkl_offset = None
-    
+
     if self.params.refinement_protocol.n_macro_cycles in ('auto', libtbx.Auto):
       self.params.refinement_protocol.n_macro_cycles = 1
 
@@ -108,12 +107,12 @@ class iota_indexer(stills_indexer):
         else:
           assert False
 
-    
+
     if params.indexing.basis_vector_combinations.max_refine is libtbx.Auto:
       params.indexing.basis_vector_combinations.max_refine = 5
 
     # Ensure the indexer and downstream applications treat this as set of stills
-    from dxtbx.imageset import ImageSet 
+    from dxtbx.imageset import ImageSet
     reset_sets = []
     for i in range(len(imagesets)):
       imagesweep = imagesets.pop(0)
@@ -137,9 +136,9 @@ class iota_indexer(stills_indexer):
     return idxr
 
   def index(self, provided_experiments=None,debug=False):
-    ''' This step does  1. find_lattices (via a method like fft1d) 
+    ''' This step does  1. find_lattices (via a method like fft1d)
                         2. Assign hkl indices (through index_reflections)
-                        3. Housekeeping like apply_symmetry, discard too similar models 
+                        3. Housekeeping like apply_symmetry, discard too similar models
     '''
 
     experiments = ExperimentList()
@@ -199,7 +198,7 @@ class iota_indexer(stills_indexer):
           from scitbx.matrix import sqr
           hklfrac=flex.mat3_double(len(miller_indices), sqr(cryst.get_A()).inverse())*self.reflections['rlp'].select(self.reflections['id']==i_expt)
           self.reflections['fractional_miller_index'].set_selected(self.reflections['id']==i_expt, hklfrac)
-          
+
     # Discard nearly overlapping lattices
 
     if len(experiments) > 1:
@@ -232,7 +231,7 @@ class iota_indexer(stills_indexer):
     params_simple = self.params.index_assignment.simple
     self.assign_hkl_to_reflections(reflections, experiments, self.d_min,
                       tolerance = params_simple.hkl_tolerance, debug=debug)
-     
+
     if self.hkl_offset is not None and self.hkl_offset != (0,0,0):
       reflections['miller_index'] = apply_hkl_offset(
         reflections['miller_index'], self.hkl_offset)
@@ -259,19 +258,19 @@ class iota_indexer(stills_indexer):
     rlps = reciprocal_lattice_points.select(isel)
     refs = reflections.select(isel)
     phi = refs['xyzobs.mm.value'].parts()[2]
-  
+
     diffs = []
     norms = []
     hkl_ints = []
-  
+
     UB_matrices = flex.mat3_double([cm.get_A() for cm in experiments.crystals()])
     imgset_ids = reflections['imageset_id'].select(sel)
-  
+
     for i_imgset, imgset in enumerate(experiments.imagesets()):
       sel_imgset = (imgset_ids == i_imgset)
       result = AssignIndices(
         rlps.select(sel_imgset), phi.select(sel_imgset), UB_matrices, tolerance=tolerance)
- 
+
       miller_indices = result.miller_indices()
       crystal_ids = result.crystal_ids()
       expt_ids = flex.int(crystal_ids.size(), -1)
@@ -280,7 +279,7 @@ class iota_indexer(stills_indexer):
         for i_expt in experiments.where(
           crystal=cryst, imageset=imgset):
           expt_ids.set_selected(sel_cryst, i_expt)
-  
+
       reflections['miller_index'].set_selected(isel.select(sel_imgset), miller_indices)
       reflections['id'].set_selected(isel.select(sel_imgset), expt_ids)
       reflections.set_flags(
@@ -295,14 +294,14 @@ class iota_indexer(stills_indexer):
     Ainverse = flex.mat3_double(len(reflections), sqr(experiments.crystals()[0].get_A()).inverse())
     q = reflections['rlp']
     hkl_frac = Ainverse*q
-    hkl = hkl_frac.iround() 
+    hkl = hkl_frac.iround()
     reflections['miller_index'] = flex.miller_index(len(reflections),(0,0,0))
     reflections['fractional_miller_index'] = flex.vec3_double(len(reflections),(0.0,0.0,0.0))
     reflections['miller_index'] = flex.miller_index(list(hkl))
     reflections['fractional_miller_index'] = hkl_frac
     reflections.set_flags(reflections['miller_index'] != (0,0,0), reflections.flags.indexed)
-    
-    
+
+
 
 
 class iota_indexer_fft1d(iota_indexer, indexer_fft1d):

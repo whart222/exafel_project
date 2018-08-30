@@ -190,10 +190,10 @@ class Script_iota(Script):
         else:
           item_list = comm.recv(source=master_rank, tag=0)
           print ('rank %d receiving information from rank %d'%(i,master_rank))
-       
+
         processor = Processor_iota(copy.deepcopy(params), composite_tag = "%04d"%i)
         #comm.recv()
-        #return 
+        #return
         for item in item_list:
           tag, filename = item
 
@@ -231,19 +231,19 @@ class Script_iota(Script):
       logger.info("hello from rank %d out of %d"%(rank,size))
       if self.params.iota.method !='off' and int(size*self.params.iota.random_sub_sampling.fraction_nproc) > 0:
         master_ranks = [x for x in range(size) if x%(int(size*self.params.iota.random_sub_sampling.fraction_nproc)) == 0]
-        if rank in master_ranks: 
+        if rank in master_ranks:
           begin = master_ranks.index(rank)*int(len(iterable)/len(master_ranks))
           end = (master_ranks.index(rank)+1)*int(len(iterable)/len(master_ranks))
           if end > len(iterable):
             end = len(iterable)
-          subset = iterable[begin:end] 
+          subset = iterable[begin:end]
           #print('master rank %d assigned job'%rank, subset)
         else:
           subset = []
           #print('Rank %d not a master rank: wait for instructions'%rank)
       else:
-        subset = [item for i, item in enumerate(iterable) if (i+rank)%size== 0] 
-     
+        subset = [item for i, item in enumerate(iterable) if (i+rank)%size== 0]
+
       print(rank)
       comm.barrier()
       #print ('info =', rank, ncores)
@@ -256,9 +256,9 @@ class Script_iota(Script):
             if x < rank:
               master_rank = x
             else:
-              return master_rank  
+              return master_rank
           return master_rank
-        master_rank = find_master_rank(rank) 
+        master_rank = find_master_rank(rank)
       #exit()
       do_work(rank, subset, master_rank)
       comm.barrier()
@@ -286,7 +286,7 @@ class Script_iota(Script):
 
 class Processor_iota(Processor):
   ''' Processor class with functions customized for iota style processing '''
-  
+
   def process_datablock(self, tag, datablock, rank, master_rank):
     if not self.params.output.composite_output:
       self.setup_filenames(tag)
@@ -297,7 +297,7 @@ class Processor_iota(Processor):
       from dxtbx.datablock import DataBlockDumper
       dump = DataBlockDumper(datablock)
       dump.as_json(self.params.output.datablock_filename)
-  
+
     # Do the processing
     try:
       self.pre_process(datablock)
@@ -327,12 +327,12 @@ class Processor_iota(Processor):
             observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
             try:
               experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
-            except:
+            except Exception:
               print('Indexing failed for some reason')
             if len(indexed_tmp) >len_max_indexed:
               len_max_indexed = len(indexed_tmp)
               experiments = experiments_tmp
-              indexed = indexed_tmp 
+              indexed = indexed_tmp
             len_indexed_arr.append(len(indexed_tmp))
           print('fraction subsampled = ', self.params.iota.random_sub_sampling.fraction_sub_sample, len(indexed), len_indexed_arr)
           #from IPython import embed; embed(); exit()

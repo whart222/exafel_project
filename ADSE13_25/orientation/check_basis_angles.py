@@ -1,9 +1,7 @@
 from __future__ import division
-import sys, os
-from libtbx import easy_pickle
+import sys
 from scitbx.matrix import sqr, col
 from cctbx import crystal # dependency for integration pickles
-from scitbx.math import flex
 from cctbx_orientation_ext import crystal_orientation
 
 """

@@ -35,7 +35,7 @@ typedef int intType;
 
 namespace sparse_solver {
 
-  //template<typename numType, typename intType> 
+  //template<typename numType, typename intType>
   struct my_solver{
     my_solver(intType n)//int argc, char* argv[])
     {

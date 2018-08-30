@@ -57,7 +57,7 @@ if [ ! -e OPENMPI.tar.gz ] && [ "$NERSC_HOST" != "cori" ]; then
   echo "Downloading OPENMPI"
   curl -L $OPENMPI -o OPENMPI.tar.gz
   mkdir ../strumpack_deps/OPENMPI
-  tar xvf OPENMPI.tar.gz -C ../strumpack_deps/OPENMPI --strip-components 1 
+  tar xvf OPENMPI.tar.gz -C ../strumpack_deps/OPENMPI --strip-components 1
 fi
 
 # METIS v5.1.0 nested dissection
@@ -91,7 +91,7 @@ if [ ! -e SCOTCH.tar.gz ]; then
   tar xvf SCOTCH.tar.gz -C ../strumpack_deps
 fi
 
-# TCMALLOC: Faster malloc/new; Can potentially also use tbbmalloc 
+# TCMALLOC: Faster malloc/new; Can potentially also use tbbmalloc
 # Comes with gperftools (Google performance tools)
 # Not yet integrated into build
 if [ ! -e TCMALLOC.tar.gz ]; then
@@ -113,7 +113,7 @@ if [ ! -e CMAKE.tar.gz ] && [ "$NERSC_HOST" != "cori" ]; then
   if [[ "$OSTYPE" == "linux"* ]]; then
     curl -L $CMAKE/cmake-3.9.1-Linux-x86_64.tar.gz -o CMAKE.tar.gz
     export CMAKE_DIR=$PWD/../strumpack_deps/cmake-3.9.1-Linux-x86_64/
-  elif [[ "$OSTYPE" == "darwin"* ]];then 
+  elif [[ "$OSTYPE" == "darwin"* ]];then
     curl -L $CMAKE/cmake-3.9.1-Darwin-x86_64.tar.gz -o CMAKE.tar.gz
     export CMAKE_DIR=$PWD/../strumpack_deps/cmake-3.9.1-Darwin-x86_64/CMake.app/Contents/
   fi
@@ -144,7 +144,7 @@ INC_DIR="-I$PWD/strumpack_build/include -I$CONDA_PREFIX/include "
 if [ "$NERSC_HOST" == "cori" ]; then
   LIB_DIR="$LIB_DIR $(cc --cray-print-opts=libs)"
   INC_DIR="$INC_DIR $(cc --cray-print-opts=cflags)"
-  
+
   #cc --cray-print-opts=cflags ##Get includes
   #cc --cray-print-opts=libs ##Get libs
   #cc --cray-print-opts=all ##Get both and all linker elements
@@ -198,17 +198,17 @@ fi
 rm ./Makefile.inc.bak
 #Patch scotch makefile to exclude everything except the shared libraries
 echo '
-install_strumpack	:	required    $(includedir)   $(libdir)   $(mandir)/man1 
-						-$(CP) -f ../include/*scotch*.h $(includedir) 
-						-$(CP) -f ../lib/*scotch*$(LIB) $(libdir) 
-						-$(CP) -Rf ../man/* $(mandir) 
-scotch_strumpack	:	required 
-						(cd libscotch ; $(MAKE) VERSION=$(VERSION) RELEASE=$(RELEASE) PATCHLEVEL=$(PATCHLEVEL) scotch && \
-										$(MAKE) VERSION=$(VERSION) RELEASE=$(RELEASE) PATCHLEVEL=$(PATCHLEVEL) install && \
-										$(MAKE) VERSION=$(VERSION) RELEASE=$(RELEASE) PATCHLEVEL=$(PATCHLEVEL) ptscotch && \
-										$(MAKE) VERSION=$(VERSION) RELEASE=$(RELEASE) PATCHLEVEL=$(PATCHLEVEL) ptinstall )
+install_strumpack       :       required    $(includedir)   $(libdir)   $(mandir)/man1
+                                                -$(CP) -f ../include/*scotch*.h $(includedir)
+                                                -$(CP) -f ../lib/*scotch*$(LIB) $(libdir)
+                                                -$(CP) -Rf ../man/* $(mandir)
+scotch_strumpack        :       required
+                                                (cd libscotch ; $(MAKE) VERSION=$(VERSION) RELEASE=$(RELEASE) PATCHLEVEL=$(PATCHLEVEL) scotch && \
+                                                                                $(MAKE) VERSION=$(VERSION) RELEASE=$(RELEASE) PATCHLEVEL=$(PATCHLEVEL) install && \
+                                                                                $(MAKE) VERSION=$(VERSION) RELEASE=$(RELEASE) PATCHLEVEL=$(PATCHLEVEL) ptscotch && \
+                                                                                $(MAKE) VERSION=$(VERSION) RELEASE=$(RELEASE) PATCHLEVEL=$(PATCHLEVEL) ptinstall )
 ' >> ./Makefile
-make scotch_strumpack -j$(echo ${proc}) && make install_strumpack -j$(echo ${proc}) 
+make scotch_strumpack -j$(echo ${proc}) && make install_strumpack -j$(echo ${proc})
 cd ../..
 
 # Install OpenBLAS; MKL might be a good option too

@@ -1,3 +1,4 @@
+from __future__ import division
 from mpi4py import MPI
 
 size = MPI.COMM_WORLD.Get_size()

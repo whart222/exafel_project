@@ -1,6 +1,6 @@
 from __future__ import division
 import pandas as pd
-import sys, os
+import os
 
 from exafel_project.nks.json import to_json as tj
 import pandas as pd
@@ -12,7 +12,7 @@ class pd_table():
   @staticmethod
   def nested_dict(d, k0):
     d_list=[]
-      
+
     if isinstance(d,dict):
       for k in d.iterkeys():
         d_list.extend(pd_table.nested_dict(d[k],k))
@@ -44,14 +44,14 @@ class pd_table():
     M = tj.molprobity_interpreter(molprobity_path)
     I.refi["No. atoms"] = M.n_atoms
     I.refi["B-factors"] = M.b_factors
-  
+
     #from IPython import embed; embed()
     t2 = pd.DataFrame(I.whole['Table 2'])
-  
+
     t1_d = self.nested_dict(I.whole['Table 1'],'Table 1')
     t1_res = {}
     for k in t1_d:
       t1_res.update(k)
-    
+
     t1 = pd.DataFrame(t1_res,index=[0])
     return t1,t2

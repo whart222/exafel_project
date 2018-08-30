@@ -1,3 +1,4 @@
+from __future__ import division
 ##############################################################################
 # Copyright (c) 2013-2018, Lawrence Livermore National Security, LLC.
 # Produced at the Lawrence Livermore National Laboratory.
@@ -56,33 +57,33 @@ class Strumpack(CMakePackage):
     depends_on('openblas', type=('build','run','link'))
     depends_on('scalapack', type=('build','run','link'))
     patch('cmakelist_ctest.patch', level=1, working_dir='.')
-    
+
     def cmake_args(self):
       spec = self.spec
       options = []
       options.extend([
-          '-DCMAKE_INSTALL_PREFIX=%s' % (self.prefix), 
+          '-DCMAKE_INSTALL_PREFIX=%s' % (self.prefix),
           '-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true',
-          '-DBUILD_TESTING=%s' % ('OFF'), 
-          '-DSTRUMPACK_DEV_TESTING=%s' % ('OFF'), 
-          '-DCMAKE_BUILD_TYPE=%s' % ('Debug'), 
-          '-DSTRUMPACK_USE_OPENMP=ON', 
-          '-DSTRUMPACK_USE_PARMETIS=ON', 
+          '-DBUILD_TESTING=%s' % ('OFF'),
+          '-DSTRUMPACK_DEV_TESTING=%s' % ('OFF'),
+          '-DCMAKE_BUILD_TYPE=%s' % ('Debug'),
+          '-DSTRUMPACK_USE_OPENMP=ON',
+          '-DSTRUMPACK_USE_PARMETIS=ON',
           '-DSTRUMPACK_USE_SCOTCH=ON',
-          '-DCMAKE_CXX_FLAGS=%s %s %s %s' % ('-Wall', '-Wfatal-errors', '-Wextra', '-Wno-unused-parameter'), 
+          '-DCMAKE_CXX_FLAGS=%s %s %s %s' % ('-Wall', '-Wfatal-errors', '-Wextra', '-Wno-unused-parameter'),
           '-DMETIS_INCLUDES=%s' % spec['metis'].prefix.include,
-          '-DMETIS_LIBRARIES=%s' % join_path( spec['metis'].prefix.lib, 'libmetis.so'), 
+          '-DMETIS_LIBRARIES=%s' % join_path( spec['metis'].prefix.lib, 'libmetis.so'),
           '-DPARMETIS_INCLUDES=%s' % spec['parmetis'].prefix.include,
-          '-DPARMETIS_LIBRARIES=%s' % join_path(spec['parmetis'].prefix.lib, 'libparmetis.so'), 
+          '-DPARMETIS_LIBRARIES=%s' % join_path(spec['parmetis'].prefix.lib, 'libparmetis.so'),
           '-DSCALAPACK_LIBRARIES=%s' % join_path( spec['scalapack'].prefix.lib, 'libscalapack.so' ),
-          '-DLAPACK_LIBRARIES=%s' % join_path( spec['openblas'].prefix.lib, 'libopenblas.so' ), 
-          '-DBLAS_LIBRARIES=%s' % join_path( spec['openblas'].prefix.lib, 'libopenblas.so' ), 
-          '-DSCOTCH_INCLUDES=%s' % spec['scotch'].prefix.include, 
-          '-DSCOTCH_LIBRARIES="%s;%s;%s;%s"' % 
-          ( join_path(spec['scotch'].prefix.lib, 'libscotch.so'), 
+          '-DLAPACK_LIBRARIES=%s' % join_path( spec['openblas'].prefix.lib, 'libopenblas.so' ),
+          '-DBLAS_LIBRARIES=%s' % join_path( spec['openblas'].prefix.lib, 'libopenblas.so' ),
+          '-DSCOTCH_INCLUDES=%s' % spec['scotch'].prefix.include,
+          '-DSCOTCH_LIBRARIES="%s;%s;%s;%s"' %
+          ( join_path(spec['scotch'].prefix.lib, 'libscotch.so'),
             join_path(spec['scotch'].prefix.lib, 'libscotcherr.so'),
             join_path(spec['scotch'].prefix.lib, 'libptscotch.so'),
-            join_path(spec['scotch'].prefix.lib, 'libptscotcherr.so') 
+            join_path(spec['scotch'].prefix.lib, 'libptscotcherr.so')
           )
         ])
       return options

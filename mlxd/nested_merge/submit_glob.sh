@@ -19,7 +19,7 @@ for ii in $(seq -w 95 114); do
     g=$(eval "echo \"r0{${str}}*.tar\" ")
   fi
   echo $g
-  
+
   #Create a submission script with the appropriate arguments
   cat sbatch_merge.sh | sed "s~<tag_template>~r0${ii}~g" | sed "s~<glob_template>~${g}~g" | sed "s~<tar_template>~${TARDIR}~g"  | sed "s~<data_out_template>~${OUTDIR}~g" > sbatch_merge_r0${ii}.sh
 

@@ -1216,7 +1216,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
             print('IOTA:SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']),' ', trial)
             experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
             experiments_list.append(experiments_tmp)
-          except:
+          except Exception:
             print('Indexing failed for some reason')
         if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
           from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get_consensus

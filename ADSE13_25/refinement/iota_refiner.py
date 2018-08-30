@@ -1,6 +1,5 @@
 from __future__ import absolute_import, division
 from __future__ import print_function
-import math
 import logging
 logger = logging.getLogger(__name__)
 
@@ -9,32 +8,20 @@ from dials.util import log
 debug_handle = log.debug_handle(logger)
 info_handle = log.info_handle(logger)
 
-import libtbx
 from libtbx.utils import Sorry
 
-from dials.algorithms.indexing.indexer import indexer_base
-from dials.algorithms.indexing.known_orientation import indexer_known_orientation
-from dials.algorithms.indexing.real_space_grid_search import indexer_real_space_grid_search
-from dials.algorithms.indexing.fft3d import indexer_fft3d
-from dials.algorithms.indexing.fft1d import indexer_fft1d
 from dials_algorithms_indexing_ext import *
 
-import iotbx.phil
-from scitbx import matrix
+import iotbx.phil # implicit import
 
 from dials.array_family import flex
-from cctbx import crystal, sgtbx, xray
-
-from dxtbx.model import Crystal
-from dxtbx.model.experiment_list import Experiment, ExperimentList
-
-from dials.algorithms.indexing.indexer import max_cell_phil_str, index_only_phil_str,master_params
-from dials.algorithms.indexing.stills_indexer import stills_indexer, e_refine
+from cctbx import crystal
+from dials.algorithms.indexing.stills_indexer import stills_indexer
 
 
 
 class iota_refiner(stills_indexer):
-  ''' Class for doing refinement and outlier rejection after iota indexing is done 
+  ''' Class for doing refinement and outlier rejection after iota indexing is done
       Although this class subclasses stills_indexer, it should never be used for any
       iota related indexing. There is a separate class for that.'''
   def __init__ (self, experiments, indexed, imagesets,params):
@@ -180,4 +167,4 @@ class iota_refiner(stills_indexer):
         xyzcal_px = flex.vec3_double(x_px, y_px, z_px)
         self.refined_reflections['xyzcal.px'].set_selected(imgset_sel, xyzcal_px)
 
-        return self.refined_experiments, self.refined_reflections 
+        return self.refined_experiments, self.refined_reflections

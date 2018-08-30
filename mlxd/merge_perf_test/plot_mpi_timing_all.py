@@ -1,6 +1,6 @@
+from __future__ import division
 import sys
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import matplotlib.markers as mkr
 from matplotlib import colors as mc
@@ -49,7 +49,7 @@ for b in xrange(len(ds)):
     ax.scatter( ds[b][0][a][0], ds[b][0][a][1], ds[b][0][a][2]-t0, c=mc.XKCD_COLORS[mc.XKCD_COLORS.keys()[b]], marker='.', markersize=1, alpha=0.33 )#mkr.MarkerStyle(b), alpha=0.25) #Plot start
     ax.scatter( de[b][0][a][0], de[b][0][a][1], de[b][0][a][2]-t0, c=mc.XKCD_COLORS[mc.XKCD_COLORS.keys()[b*2]], marker='.', markersize=1, alpha=0.33 )#mkr.MarkerStyle(b), alpha=0.25) #Plot end
     ax.plot( [ ds[b][0][a][0], de[b][0][a][0] ], [ ds[b][0][a][1], de[b][0][a][1] ], [ ds[b][0][a][2] - t0, de[b][0][a][2] - t0 ], c='k') #Draw line between start and finish
-  
+
 ax.set_zlim3d([ 0, np.max(max_t0) - t0 ])
 ax.set_ylim3d([ np.min([ min_s, min_e ]), np.max([ max_s, max_e ]) ])
 ax.set_xlim3d([ np.min([ min_s, min_e ]), np.max([ max_e, max_e ]) ])
@@ -64,7 +64,7 @@ for ii in xrange(np.max([start['A'],start['B']])):
 
 #Draw lines between the start and end for reducing 2 data sets
 for a in ds[0].keys():
-  
+
   plt.plot( [ ds[0][a][2] - t0, de[0][a][2] - t0] , [ds[0][a][1], de[0][a][0]], linestyle='-', linewidth=0.5, c='k', alpha=0.8)
   plt.scatter( start['t'] - t0, start['B'], marker='x', c='r', alpha=0.8)
   plt.scatter( end['t'] - t0, end['A'], marker='o', c='b', alpha=0.8)

@@ -33,14 +33,14 @@ target_unit_cell=67.2,59.8,47.2,90,110.3,90 \
 target_space_group=C2 \
 significance_filter.apply=False \
 set_average_unit_cell=True \
-scaling.algorithm=levmar \ 
+scaling.algorithm=levmar \
 \
-levmar.linsolver=cg \ 
-levmar.strumpack.enable=True \ 
-levmar.strumpack.mpi=False \ 
-levmar.strumpack.algorithm=bicgstab \ 
-levmar.strumpack.reordering=scotch \ 
-levmar.strumpack.hss=False \ 
+levmar.linsolver=cg \
+levmar.strumpack.enable=True \
+levmar.strumpack.mpi=False \
+levmar.strumpack.algorithm=bicgstab \
+levmar.strumpack.reordering=scotch \
+levmar.strumpack.hss=False \
 levmar.strumpack.verbose=True \
 \
 levmar.compute_cc_half=False \
@@ -98,4 +98,3 @@ input.symmetry_safety_check=warning \
 xray_data.r_free_flags.file_name=${trial}_001.mtz \
 xray_data.r_free_flags.label=R-free-flags \
 selection="element Fe" |tee ${trial}_peakht.log
-

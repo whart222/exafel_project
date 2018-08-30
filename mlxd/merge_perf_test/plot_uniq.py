@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 from matplotlib import pyplot as plt
 import os, sys
@@ -20,7 +21,7 @@ print "tag=%s"%tag
 #Get the different bar identifiers
 with open(tag+'_unique.dat') as fUniqDat:
   uniqStr = fUniqDat.readlines()
-uniqStr = [x.strip() for x in uniqStr] 
+uniqStr = [x.strip() for x in uniqStr]
 print uniqStr
 data = {}
 counter = len(uniqStr)
@@ -80,7 +81,7 @@ for ii in np.argsort(dat_d):
   counter +=1
 legendStr += r" \end{eqnarray*}"
 print legendStr
-  
+
 #Plot the legends
 props0 = dict(boxstyle='round',facecolor='wheat',alpha=0.5)
 ax.text(0.05, 0.95, legendStr, transform=ax.transAxes, fontsize=10,verticalalignment='top', bbox=props0)

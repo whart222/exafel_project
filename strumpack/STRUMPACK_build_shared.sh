@@ -21,7 +21,7 @@ INC_DIR="-I$PWD/strumpack_build/include -I$CONDA_PREFIX/include "
 if [ "$NERSC_HOST" == "cori" ]; then
   LIB_DIR="$LIB_DIR $(cc --cray-print-opts=libs)"
   INC_DIR="$INC_DIR $(cc --cray-print-opts=cflags)"
-  
+
   #cc --cray-print-opts=cflags ##Get includes
   #cc --cray-print-opts=libs ##Get libs
   #cc --cray-print-opts=all ##Get both and all linker elements

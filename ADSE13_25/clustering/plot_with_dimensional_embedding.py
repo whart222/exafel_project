@@ -1,7 +1,6 @@
 from __future__ import division
 import sys
 from scitbx.simplex import simplex_opt
-from scitbx.matrix import col
 import scitbx.lbfgs
 
 class lbfgs_helper():
@@ -18,7 +17,7 @@ class lbfgs_helper():
                      (traditional_convergence_test_eps=1.e-2, min_iterations=0), core_params =
                      scitbx.lbfgs.core_parameters(gtol=0.1), log=sys.stdout)
     self.a = self.x
-  
+
   def compute_functional_and_gradients(self):
     self.a = self.x
     f,g = self.target_func_and_grad()
@@ -37,11 +36,11 @@ class lbfgs_helper():
 
     grad = -2.*inner.matrix_multiply(coord_x)
     grad = grad.concatenate(-2.*inner.matrix_multiply(coord_y))
-    
+
     return result,grad
     # ------- Original Implementation :: Super slow ------------------
     # Note that plotting should change since here we assume self.x is [x1,y1,x2,y2, .....]
-    #grad = flex.double(self.n) 
+    #grad = flex.double(self.n)
     #result = 0.0
     #NN = self.x.size()//2
     #for i in range(0,NN-1):
@@ -73,7 +72,7 @@ class SimplexMinimizer(object):
     for i in range(self.n+1):
       self.starting_simplex.append(random_scale*(((mt.random_double(self.n))/2.0)-1.0)+self.x)
 
-    self.optimizer = simplex_opt(dimension=self.n, matrix=self.starting_simplex, evaluator=self, tolerance=1e-3)  
+    self.optimizer = simplex_opt(dimension=self.n, matrix=self.starting_simplex, evaluator=self, tolerance=1e-3)
     self.x = self.optimizer.get_solution()
 
   def target(self, vector):
@@ -81,7 +80,7 @@ class SimplexMinimizer(object):
     NN = self.r.focus()[0]
     for i in range(0,len(vector)-2,2):
       for j in range(i+2, len(vector),2):
- 
+
         #from IPython import embed; embed(); exit()
         f= self.r[(i//2)*NN+(j//2)] - (vector[i]*vector[j]+vector[i+1]*vector[j+1])
         f2 += f*f
@@ -168,7 +167,7 @@ def run_detail(show_plot, save_plot, use_dummy_data=False):
     NN = len(MM)
     import omptbx
     omptbx.omp_set_num_threads(64)
-    from cctbx.uctbx.determine_unit_cell import NCDist_matrix,NCDist_flatten
+    from cctbx.uctbx.determine_unit_cell import NCDist_flatten
     if use_dummy_data:
       '''
       Generate blob data using sklearn. See example here.
@@ -209,4 +208,3 @@ if __name__ == "__main__":
   Example files are given in the exafel_project/ADSE13-25 itself
   '''
   run_detail(show_plot=True, save_plot=False, use_dummy_data=False)
-

@@ -236,7 +236,7 @@ class Script_iota(Script):
       comm = MPI.COMM_WORLD
       rank = comm.Get_rank() # each process in MPI has a unique id, 0-indexed
       size = comm.Get_size() # size: number of processes running in this job
-      subset = [item for i, item in enumerate(iterable) if (i+rank)%size== 0] 
+      subset = [item for i, item in enumerate(iterable) if (i+rank)%size== 0]
       do_work(rank, subset)
       comm.barrier()
     else:
@@ -261,7 +261,7 @@ class Script_iota(Script):
 
 class Processor_iota(Processor):
   ''' Processor class with functions customized for iota style processing '''
-  
+
   def process_datablock(self, tag, datablock):
     if not self.params.output.composite_output:
       self.setup_filenames(tag)
@@ -271,7 +271,7 @@ class Processor_iota(Processor):
       from dxtbx.datablock import DataBlockDumper
       dump = DataBlockDumper(datablock)
       dump.as_json(self.params.output.datablock_filename)
-  
+
     # Do the processing
     try:
       self.pre_process(datablock)
@@ -317,7 +317,7 @@ class Processor_iota(Processor):
 
               experiments_list.append(experiments_tmp)
               observed_samples_list.append(observed_sample)
-            except:
+            except Exception:
               print('Indexing failed for some reason')
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
             from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get_consensus
@@ -339,7 +339,7 @@ class Processor_iota(Processor):
             from dxtbx.model.experiment_list import ExperimentList, Experiment
             indexed = dials_flex.reflection_table()
             experiments = ExperimentList()
-            sample = {} 
+            sample = {}
             all_experimental_models = {}
             for idx,crystal_model in enumerate(clustered_experiments_list):
               if crystal_model >= 0:
@@ -352,10 +352,10 @@ class Processor_iota(Processor):
             all_indexed_tmp = dials_flex.reflection_table()
             all_experiments_tmp = ExperimentList()
             tmp_counter = 0
-            for crystal_model in sample: 
+            for crystal_model in sample:
               # Need to have a minimum number of experiments for correct stats
               # FIXME number should not be hardcoded. ideally a phil param
-              if len(all_experimental_models[crystal_model]) < 3: 
+              if len(all_experimental_models[crystal_model]) < 3:
                 continue
               self.known_crystal_models = None
               union_indices=flex.union(len(observed), iselections=sample[crystal_model])
@@ -367,9 +367,9 @@ class Processor_iota(Processor):
               imagesets = datablock.extract_imagesets()
               explist_centroid = ExperimentList()
               for i,imageset in enumerate(imagesets):
-                exp = Experiment(imageset=imageset, 
+                exp = Experiment(imageset=imageset,
                                  beam=imageset.get_beam(),
-                                 detector=imageset.get_detector(), 
+                                 detector=imageset.get_detector(),
                                  goniometer=imageset.get_goniometer(),
                                  scan=imageset.get_scan(),
                                  crystal=known_crystal_models[crystal_model])
@@ -414,14 +414,14 @@ class Processor_iota(Processor):
                   experiments_tmp = explist
                   indexed_tmp = reidxr.reflections
                   # FIXME take out
-                  
+
                   indexed_tmp['id'].set_selected(flex.size_t(range(len(indexed_tmp))),tmp_counter)
                   all_indexed_tmp.extend(indexed_tmp)
                   all_experiments_tmp.append(exp)
                   tmp_counter +=1
 
                   # find dh = |h_frac - h_centroid|
-                  indexed_idxlist = [idx for idx,elem in enumerate(indexed_tmp['xyzobs.mm.value']) 
+                  indexed_idxlist = [idx for idx,elem in enumerate(indexed_tmp['xyzobs.mm.value'])
                                      if elem in indexed_centroid['xyzobs.mm.value']]
                   dh_list_tmp = flex.double()
                   for idx in indexed_idxlist:
@@ -434,7 +434,7 @@ class Processor_iota(Processor):
                     if x == (0,0,0): continue
                   print ('finished evaluating dh_list for crystal model ',crystal_model)
                 except Exception as e:
-                  print ('Reindexing with candidate lattices on union set failed')  
+                  print ('Reindexing with candidate lattices on union set failed')
               # Get a sense of the variability in dh. Assign Z-score cutoff from there
               try:
                 Z_cutoff = self.params.iota.random_sub_sampling.Z_cutoff
@@ -447,14 +447,14 @@ class Processor_iota(Processor):
                   hfrac,kfrac,lfrac = hkl_all_values[refl['miller_index']].parts()
                   dh_cutoff = hfrac.sample_standard_deviation()*hfrac.sample_standard_deviation()+ \
                               kfrac.sample_standard_deviation()*kfrac.sample_standard_deviation()+ \
-                              lfrac.sample_standard_deviation()*lfrac.sample_standard_deviation()  
+                              lfrac.sample_standard_deviation()*lfrac.sample_standard_deviation()
                   dh_cutoff = math.sqrt(dh_cutoff)*Z_cutoff
                   #import pdb; pdb.set_trace()
                   panel = experiments_centroid.detectors()[0][0]
                   beam = experiments_centroid.beams()[0]
                   resolution = panel.get_resolution_at_pixel(beam.get_s0(),refl['xyzobs.px.value'][0:2])
                   print ('MILLER_INDEX_DH_STATS', refl['miller_index'], ' ',dh,' ',dh_cutoff,' ',resolution)
-                  #if refl['miller_index'] == (22,6,1): 
+                  #if refl['miller_index'] == (22,6,1):
                   #from IPython import embed; embed(); exit()
                   if dh < dh_cutoff and refl['miller_index'] != (0,0,0):
                     indexed_spots_idx.append(ii)
@@ -467,10 +467,10 @@ class Processor_iota(Processor):
                     print ('APPENDING EXPERIMENT = ',crystal_model,iexpt)
                     experiments.append(expt)
 
-              except:
+              except Exception:
                 print ('dh_list calculation and outlier rejection failed')
 
-            # Make sure crytal model numbers are in sequence, example 0,1,2 instead of 0,2,3 
+            # Make sure crytal model numbers are in sequence, example 0,1,2 instead of 0,2,3
             # when model 1 was not used for consensus part. Otherwise refine won't work
             max_id = flex.max(indexed['id'])
             original_ids = []

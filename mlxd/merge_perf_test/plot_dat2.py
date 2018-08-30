@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 from matplotlib import pyplot as plt
 import os
@@ -13,7 +14,7 @@ t0=sys.argv[5] #t0 offset
 #Get the different bar identifiers
 with open(cwd+'_uniq.dat') as fUniqDat:
   uniqStr = fUniqDat.readlines()
-uniqStr = [x.strip() for x in uniqStr] 
+uniqStr = [x.strip() for x in uniqStr]
 
 for u in uniqStr:
   #Load data
@@ -38,7 +39,7 @@ p1 = ax.bar(bins,dat_d, width=0.35, align='center',color=(0.25,0.5,0.8))
 
 plt.rc('text',usetex=True)
 plt.rc('font',family='serif')
-titleStr = '\noindent ' + title + '; ' + ranks ' MPI ranks; runs='  + dataset + ' \\%s'
+titleStr = '\noindent ' + title + '; ' + ranks + ' MPI ranks; runs='  + dataset + ' \\%s'
 plt.title(repr(titleStr)%cwd.replace("_","\_").rsplit("/",1)[1], fontsize=8)
 plt.ylabel('t [s]')
 plt.xticks(bins,tuple(uniqStr))

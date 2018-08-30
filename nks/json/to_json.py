@@ -14,14 +14,14 @@ class xmerge_interpreter(object):
     self.get_cchalf_table()
     self.get_lattices()
     self.get_nmeas()
-  
+
   #Often the output text tables are formatted differently depending upon the input data size
   #Take into account the presence of no number or improper number parsing by checking if number is a float
   @staticmethod
   def isFloat(num):
     try:
       return float(num), True
-    except:
+    except Exception:
       return float('nan'), False
 
   def get_cchalf_table(self):
@@ -49,11 +49,11 @@ class xmerge_interpreter(object):
       else:
         resolution_low.append("%.2f"%(float(st.split()[1])))
         resolution_high.append("%.2f"%(float(st.split()[3])))
-	#Parsing after the ] due to potential whitespace issues with low data numbers  
+        #Parsing after the ] due to potential whitespace issues with low data numbers
         #from IPython import embed; embed()
-        cc_int.append( self.isFloat(st.split("]")[1].split()[0].strip("%"))[0] ) 
-        r_split.append( self.isFloat(st.split("]")[1].split()[5].strip("%"))[0] ) 
-        cc_iso.append( self.isFloat(st.split("]")[1].split()[2].strip("%"))[0] ) 
+        cc_int.append( self.isFloat(st.split("]")[1].split()[0].strip("%"))[0] )
+        r_split.append( self.isFloat(st.split("]")[1].split()[5].strip("%"))[0] )
+        cc_iso.append( self.isFloat(st.split("]")[1].split()[2].strip("%"))[0] )
 
     # Lowest resolution possibly set to infinity
     for ix in xrange(len(resolution_low)):
@@ -285,7 +285,7 @@ class anomalous_interpreter(object):
           break
     try:
       self.peak_height = float(self.lines[startNum].split()[-2])
-    except:
+    except Exception:
       self.peak_height = float('nan')
 
 if __name__=="__main__":

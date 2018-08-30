@@ -58,7 +58,7 @@ if [ ! -e OPENMPI.tar.gz ]; then
   echo "Downloading OPENMPI"
   curl -L $OPENMPI -o OPENMPI.tar.gz
   mkdir ../deps/OPENMPI
-  tar xvf OPENMPI.tar.gz -C ../deps/OPENMPI --strip-components 1 
+  tar xvf OPENMPI.tar.gz -C ../deps/OPENMPI --strip-components 1
 fi
 
 
@@ -93,7 +93,7 @@ if [ ! -e SCOTCH.tar.gz ]; then
   tar xvf SCOTCH.tar.gz -C ../deps
 fi
 
-# TCMALLOC: Faster malloc/new; Can potentially also use tbbmalloc 
+# TCMALLOC: Faster malloc/new; Can potentially also use tbbmalloc
 # Comes with gperftools (Google performance tools)
 # Not yet integrated into build
 if [ ! -e TCMALLOC.tar.gz ]; then
@@ -115,7 +115,7 @@ if [ ! -e CMAKE.tar.gz ]; then
   if [[ "$OSTYPE" == "linux"* ]]; then
     curl -L $CMAKE/cmake-3.9.1-Linux-x86_64.tar.gz -o CMAKE.tar.gz
     export CMAKE_DIR=$PWD/../deps/cmake-3.9.1-Linux-x86_64/
-  elif [[ "$OSTYPE" == "darwin"* ]];then 
+  elif [[ "$OSTYPE" == "darwin"* ]];then
     curl -L $CMAKE/cmake-3.9.1-Darwin-x86_64.tar.gz -o CMAKE.tar.gz
     export CMAKE_DIR=$PWD/../deps/cmake-3.9.1-Darwin-x86_64/CMake.app/Contents/
   fi
@@ -146,7 +146,7 @@ INC_DIR="-I$PWD/builds/include -I$CONDA_PREFIX/include "
 if [ "$NERSC_HOST" == "cori" ]; then
   LIB_DIR="$LIB_DIR $(cc --cray-print-opts=libs)"
   INC_DIR="$INC_DIR $(cc --cray-print-opts=cflags)"
-  
+
   #cc --cray-print-opts=cflags ##Get includes
   #cc --cray-print-opts=libs ##Get libs
   #cc --cray-print-opts=all ##Get both and all linker elements

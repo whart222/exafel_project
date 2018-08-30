@@ -1,8 +1,7 @@
+from __future__ import division
 import sys
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
-import matplotlib.markers as mkr
 
 StartStr = str(sys.argv[1])
 EndStr = str(sys.argv[2])
@@ -39,7 +38,7 @@ for ii in xrange(np.max([start['A'],start['B']])):
 
 #Draw lines between the start and end for reducing 2 data sets
 for a in ds[0].keys():
-  
+
   plt.plot( [ ds[0][a][2] - t0, de[0][a][2] - t0] , [ds[0][a][1], de[0][a][0]], linestyle='-', linewidth=0.5, c='k', alpha=0.8)
   plt.scatter( start['t'] - t0, start['B'], marker='x', c='r', alpha=0.8)
   plt.scatter( end['t'] - t0, end['A'], marker='o', c='b', alpha=0.8)

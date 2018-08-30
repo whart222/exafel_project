@@ -36,7 +36,7 @@ fi
 #source the phenix build for single node execution:
 cxi.xmerge ${effective_params} && \
 
-source ${PHENIX_ROOT}/phenix-installer-dev-2880-source/build/setpaths.sh 
+source ${PHENIX_ROOT}/phenix-installer-dev-2880-source/build/setpaths.sh
 
 phenix.xtriage ${trial}.mtz scaling.input.xray_data.obs_labels=Iobs |tee xtriage_${trial}.out && \
 
@@ -71,4 +71,3 @@ molprobity.flags.nqh=False molprobity.flags.rna=False molprobity.flags.restraint
 output.coot=False output.probe_dots=False output.prefix=${trial}_molprobity && \
 
 libtbx.python ${EXAFEL_DIR}/nks/json/to_json.py ${MERGE_ROOT} ${trial}
-

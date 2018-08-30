@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 from matplotlib import pyplot as plt
 import os
@@ -11,7 +12,7 @@ dataset=sys.argv[3] #TARs used
 #Get the different bar identifiers
 with open(fname) as fUniqDat:
   uniqStr = fUniqDat.readlines()
-uniqStr = [x.strip() for x in uniqStr] 
+uniqStr = [x.strip() for x in uniqStr]
 
 dat = np.loadtxt('mpi_perf.dat',dtype={'names':('label','rank','t0','tend'), 'formats':('S32','i4','f8','f8')}, delimiter=',')
 
@@ -29,7 +30,7 @@ p1 = ax.bar(bins,dat_d, width=0.35, align='center',color=(0.25,0.5,0.8))
 
 plt.rc('text',usetex=True)
 plt.rc('font',family='serif')
-titleStr = '\noindent ' + title + '; ' + ranks ' MPI ranks; runs='  + dataset + ' \\%s'
+titleStr = '\noindent ' + title + '; ' + ranks + ' MPI ranks; runs='  + dataset + ' \\%s'
 plt.title(repr(titleStr)%cwd.replace("_","\_").rsplit("/",1)[1], fontsize=8)
 plt.ylabel('t [s]')
 plt.xticks(bins,tuple(uniqStr))

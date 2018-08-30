@@ -15,7 +15,7 @@ cd $1
 export MERGE_ROOT=/global/cscratch1/sd/mlxd/sept_sprint/merge_multi
 export TAG=myTag
 
-#Copy data from the BB staged-out directory to the current working directory 
+#Copy data from the BB staged-out directory to the current working directory
 cp -r ${MERGE_ROOT}/bb/${TAG}/* ${MERGE_ROOT}/${TAG}
 
 export MULTINODE=False

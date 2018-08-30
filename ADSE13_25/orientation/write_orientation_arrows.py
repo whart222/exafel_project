@@ -1,32 +1,31 @@
 from __future__ import division
-import sys, os
+import sys
 from libtbx import easy_pickle
 from scitbx.matrix import sqr, col
 from cctbx import crystal # dependency for integration pickles
-from scitbx.math import flex
 from cctbx_orientation_ext import crystal_orientation
 
 """
 Script that examines a set of cctbx.xfel experiments and writes out their basis vectors
-in reciprocal space and/or realspace  in gnuplot format. 
+in reciprocal space and/or realspace  in gnuplot format.
 
 Usage: Supply pickle file with a list of experiments on the command line. Create arrows.p file. Run gnuplot, then enter load "arrows.p".
 """
 
 f = open("arrows.p",'w')
 
-init_str = '''set xrange [-50:50] 
+init_str = '''set xrange [-50:50]
 set yrange [-50:50]
-set zrange [-50:50] 
-set xlabel "x*" offset 0 
-set ylabel "y*" offset 0 
-set zlabel "z*" offset 0 
+set zrange [-50:50]
+set xlabel "x*" offset 0
+set ylabel "y*" offset 0
+set zlabel "z*" offset 0
 #set xtics offset -5
-#set ytics offset 5 
+#set ytics offset 5
 set format x ""
-set format y "" 
-set format z "" 
-set ticslevel 1.0 
+set format y ""
+set format z ""
+set ticslevel 1.0
 set border lw 4
 splot sqrt(-1) \n'''
 f.write(init_str)
@@ -45,7 +44,7 @@ for i,exp in enumerate(data):
       other = ori0, fractional_length_tolerance = 1.00,
       unimodular_generator_range=1)
     ori_best=ori.change_basis(best_similarity_transform)
-  except:
+  except Exception:
     ori_best = ori
     #from IPython import embed; embed(); exit()
  #   assert  ori.unit_cell().parameters()==ori_best.unit_cell().parameters(), 'unit cell '

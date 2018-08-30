@@ -1,8 +1,8 @@
 #!/bin/bash
 export TAG=step4K_samosa_debug_5k
 export trial=${TAG}
-export MERGE_ROOT=/net/dials/raid1/mlxd/InDev/feb_sprint/sam/merge 
-export SAMOSA_ROOT=/net/dials/raid1/mlxd/InDev/feb_sprint/sam/samosa 
+export MERGE_ROOT=/net/dials/raid1/mlxd/InDev/feb_sprint/sam/merge
+export SAMOSA_ROOT=/net/dials/raid1/mlxd/InDev/feb_sprint/sam/samosa
 export CONDA_ROOT=/net/dials/raid1/mlxd/InDev/
 source ${CONDA_ROOT}/miniconda/bin/activate myEnv
 mkdir -p ${SAMOSA_ROOT}/${TAG}
@@ -34,7 +34,7 @@ target_space_group=C2 \
 significance_filter.apply=False \
 set_average_unit_cell=True \
 scaling.algorithm=levmar \
-levmar.strumpack=False \ 
+levmar.strumpack=False \
 levmar.compute_cc_half=True \
 levmar.sdfac_value=40. \
 levmar.termination.step_threshold=0.001 \

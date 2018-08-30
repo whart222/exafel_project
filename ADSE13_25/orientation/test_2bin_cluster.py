@@ -1,9 +1,8 @@
 from __future__ import division
-import sys, os
+import sys
 from libtbx import easy_pickle
 from scitbx.matrix import sqr, col
 from cctbx import crystal # dependency for integration pickles
-from scitbx.math import flex
 from cctbx_orientation_ext import crystal_orientation
 
 """
@@ -29,7 +28,7 @@ for i,exp in enumerate(data):
       other = ori0, fractional_length_tolerance = 1.00,
       unimodular_generator_range=1)
     ori_best=ori.change_basis(best_similarity_transform)
-  except:
+  except Exception:
     ori_best = ori
   A = sqr(ori_best.reciprocal_matrix()).transpose().inverse()
   abasis = A * col((1,0,0))

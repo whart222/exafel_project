@@ -1,5 +1,5 @@
 from __future__ import division
-import sys,time
+import sys
 
 # -*- mode: python; coding: utf-8; indent-tabs-mode: nil; python-indent: 2 -*-
 #
@@ -44,7 +44,7 @@ class Script(base_Script):
     data0.uc_values.add_cells(data1.uc_values)
 
     data0.failure_modes = {k : data0.failure_modes.get(k, 0) + data1.failure_modes.get(k,0) for k in set(data0.failure_modes.keys()) | set(data1.failure_modes.keys())}
-    
+
     next_crystal_id = len(data0.crystal_table)
     data1.ISIGI['crystal_id'] += next_crystal_id
     data0.ISIGI.extend(data1.ISIGI)
