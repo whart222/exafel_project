@@ -32,7 +32,7 @@ f.write(init_str)
 filename = sys.argv[1]
 try:
   data = easy_pickle.load(filename)
-except Exception, e:
+except Exception as e:
   print "Couldn't read", filename
 is_reciprocal = True
 #from IPython import embed; embed(); exit()

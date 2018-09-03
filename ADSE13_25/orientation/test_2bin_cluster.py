@@ -12,7 +12,7 @@ from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get
 filename = sys.argv[1]
 try:
   data = easy_pickle.load(filename)
-except Exception, e:
+except Exception as e:
   print "Couldn't read", filename
 
 known_crystal_models = get_consensus(data, show_plot=True)

@@ -511,7 +511,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     try:
       params, options = self.parser.parse_args(
         show_diff_phil=True, quick_parse=True)
-    except Exception, e:
+    except Exception as e:
       if "Unknown command line parameter definition" in str(e) or \
           "The following definitions were not recognised" in str(e):
         deprecated_params = ['mask_nonbonded_pixels','gain_mask_value','algorithm','custom_parameterization']
@@ -637,7 +637,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     if not os.path.exists(debug_dir):
       try:
         os.makedirs(debug_dir)
-      except OSError, e:
+      except OSError as e:
         pass # due to multiprocessing, makedirs can sometimes fail
     assert os.path.exists(debug_dir)
 
@@ -722,7 +722,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
           # load a header only cspad cbf from the slac metrology
           try:
             self.base_dxtbx = cspad_cbf_tbx.env_dxtbx_from_slac_metrology(run, params.input.address)
-          except Exception, e:
+          except Exception as e:
             raise Sorry("Couldn't load calibration file for run %d, %s"%(run.run(), str(e)))
         elif params.format.cbf.mode == "rayonix":
           # load a header only rayonix cbf from the input parameters
@@ -813,10 +813,10 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
               print "Rank %d beginning processing"%rank
               try:
                 self.process_event(run, evt)
-              except Exception, e:
+              except Exception as e:
                 print "Rank %d unhandled exception processing event"%rank, str(e)
               print "Rank %d event processed"%rank
-        except Exception, e:
+        except Exception as e:
           print "Error caught in main loop"
           print str(e)
         print "Rank %d done with main loop"%rank
@@ -854,14 +854,14 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     print "Rank %d finalizing"%rank
     try:
       self.finalize()
-    except Exception, e:
+    except Exception as e:
       print "Rank %d, exception caught in finalize"%rank
       print str(e)
 
     if params.format.file_format == "cbf" and params.output.tmp_output_dir == "(NONE)":
       try:
         os.rmdir(tmp_dir)
-      except Exception, e:
+      except Exception as e:
         pass
 
     if params.joint_reintegration.enable:
@@ -937,7 +937,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
             self.integrate(expts, refls)
             dump = ExperimentListDumper(expts)
             dump.as_json(os.path.join(reint_dir, base_name + "_refined_experiments.json"))
-          except Exception, e:
+          except Exception as e:
             print "Couldn't reintegrate", img_file, str(e)
     print "Rank %d signing off"%rank
 
@@ -1109,7 +1109,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
     try:
       self.pre_process(datablock)
-    except Exception, e:
+    except Exception as e:
       self.debug_write("preprocess_exception", "fail")
       return
 
@@ -1155,7 +1155,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     self.debug_write("spotfind_start")
     try:
       observed = self.find_spots(datablock)
-    except Exception, e:
+    except Exception as e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("spotfinding_exception", "fail")
@@ -1228,7 +1228,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
           self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
       #
       experiments, indexed = self.index(datablock, observed)
-    except Exception, e:
+    except Exception as e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("indexing_failed_%d"%len(observed), "stop")
@@ -1250,7 +1250,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
     try:
       experiments, indexed = self.refine(experiments, indexed)
-    except Exception, e:
+    except Exception as e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("refine_failed_%d"%len(indexed), "fail")
@@ -1260,7 +1260,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       self.debug_write("reindex_start")
       try:
         self.reindex_strong(experiments, observed)
-      except Exception, e:
+      except Exception as e:
         import traceback; traceback.print_exc()
         print str(e), "event", timestamp
         self.debug_write("reindexstrong_failed_%d"%len(indexed), "fail")
@@ -1291,7 +1291,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
     try:
       integrated = self.integrate(experiments, indexed)
-    except Exception, e:
+    except Exception as e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("integrate_failed_%d"%len(indexed), "fail")
