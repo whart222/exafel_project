@@ -1,4 +1,5 @@
 from __future__ import division
+from six.moves import range
 import numpy as np
 from matplotlib import pyplot as plt
 import os
@@ -21,14 +22,14 @@ for u in uniqStr:
   dat = { u : np.loadtxt(cwd + '_' + u + '.dat',dtype={'names':('StartEnd','time'), 'formats':('i4','f8',)}, delimiter=',')} #Create dictionary of loaded data; key is the specific set
   dat[u]['time'] -= float(t0) #Start clock at 0
 
-for i in xrange(len(dat[u]['SE'])//2):
+for i in range(len(dat[u]['SE'])//2):
   plt.plot([dat['t'][i],dat['t'][i+1]],[1+(i/len(dat['SE'])),1+(i/len(dat['SE']))])
 plt.savefig('test.pdf')
 
 dat_s=np.array([]);
 dat_f=np.array([]);
 
-for ii in xrange(len(dat)):
+for ii in range(len(dat)):
     dat_s = np.append(dat_s,(dat[ii][2] - dat[0][2]))
     dat_f = np.append(dat_f,(dat[ii][3] - dat[0][2]))
 

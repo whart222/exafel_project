@@ -1,4 +1,5 @@
 from __future__ import division
+from six.moves import range
 import numpy as np
 from matplotlib import pyplot as plt
 import os, sys
@@ -36,7 +37,7 @@ for u in uniqStr:
     print "Inconsistency in %s data set"%u
     print e
     exit(-1)
-  for i in xrange(len(data[u]['StartEnd'])//2):
+  for i in range(len(data[u]['StartEnd'])//2):
     plt.plot([data[u]['time'][i],data[u]['time'][i+1]],[1+(i/len(data[u]['StartEnd'])),1+(i/len(data[u]['StartEnd']))])
 plt.savefig('test.pdf')
 

@@ -1,4 +1,5 @@
 from __future__ import division
+from six.moves import range
 import sys
 from scitbx.simplex import simplex_opt
 import scitbx.lbfgs
@@ -141,9 +142,9 @@ def run_detail(show_plot, save_plot, use_dummy_data=False):
     MM = [c.mm for c in cells] # get all metrical matrices
     from scitbx.array_family import flex
     MM_double = flex.double()
-    for i in xrange(len(MM)):
+    for i in range(len(MM)):
       Tup = MM[i]
-      for j in xrange(6):  MM_double.append(Tup[j])
+      for j in range(6):  MM_double.append(Tup[j])
 
     print("There are %d cells"%(len(MM)))
     if show_plot or save_plot:

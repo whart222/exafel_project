@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division
 from __future__ import print_function
+from six.moves import range
 import logging
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,7 @@ class iota_refiner(stills_indexer):
     id_set = set(self.refined_reflections['id'])
     if len(id_set) < len(self.refined_experiments):
       filtered_refined_reflections = flex.reflection_table()
-      for i in xrange(len(self.refined_experiments)):
+      for i in range(len(self.refined_experiments)):
         if i not in id_set:
           del self.refined_experiments[i]
       for old, new in zip(sorted(id_set), range(len(id_set))):

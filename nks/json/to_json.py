@@ -1,4 +1,5 @@
 from __future__ import division
+from six.moves import range
 # based on code from Chuck Yoon, LCLS
 import json, os, io, sys
 
@@ -56,7 +57,7 @@ class xmerge_interpreter(object):
         cc_iso.append( self.isFloat(st.split("]")[1].split()[2].strip("%"))[0] )
 
     # Lowest resolution possibly set to infinity
-    for ix in xrange(len(resolution_low)):
+    for ix in range(len(resolution_low)):
         if float(resolution_low[ix])==-1:  resolution_low[ix]="inf"
 
     self.data.update( dict([("Resolution Low",resolution_low),
@@ -100,7 +101,7 @@ class xmerge_interpreter(object):
       if "".join('Bin  Resolution Range  Completeness   %    multi> multi> n_meas   <I>    <I/sig(I)>'.split()) \
       in "".join(line.strip().split()):
           startNum = lineNum + 2
-    for iline in xrange(startNum,len(self.xmerge)):
+    for iline in range(startNum,len(self.xmerge)):
       if 'All' in self.xmerge[iline]:
           endNum = iline
           break

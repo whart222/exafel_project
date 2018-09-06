@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division, print_function
+from six.moves import range
 
 import logging
 import os
@@ -153,7 +154,7 @@ class Script_iota(Script):
       for datablock in datablocks:
         for imageset in datablock.extract_imagesets():
           paths = imageset.paths()
-          for i in xrange(len(imageset)):
+          for i in range(len(imageset)):
             subset = imageset[i:i+1]
             split_datablocks.append(DataBlockFactory.from_imageset(subset)[0])
             indices.append(i)

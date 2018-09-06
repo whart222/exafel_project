@@ -1,4 +1,5 @@
 from __future__ import division
+from six.moves import range
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,7 +13,7 @@ end=[]
 ds=[]
 de=[]
 
-for ii in xrange(len(sys.argv)//2):
+for ii in range(len(sys.argv)//2):
   StartStr.append(str(sys.argv[2*ii +1]))
   EndStr.append(str(sys.argv[2*ii +2]))
   start.append( (np.loadtxt( open( StartStr[ii] ), delimiter=',', dtype={'names': ('A','B','t'), 'formats':('i4','i4','f8')}), (StartStr[ii], EndStr[ii]) ))
@@ -27,7 +28,7 @@ min_s=[]
 min_e=[]
 max_s=[]
 max_e=[]
-for ii in xrange(len(start)):
+for ii in range(len(start)):
   max_t0.append( np.max(start[ii][0]['t']) )
   min_t0.append( np.min(start[ii][0]['t']) )
   min_s.append( np.min( [ start[ii][0]['A'], start[ii][0]['B'] ] ) )
@@ -44,7 +45,7 @@ ax = fig.add_subplot(111, projection='3d')
 ax.set_zlabel('time [s]')
 ax.set_ylabel('Rank To Merge')
 ax.set_xlabel('Rank Base')
-for b in xrange(len(ds)):
+for b in range(len(ds)):
   for a in ds[b][0].keys():
     ax.scatter( ds[b][0][a][0], ds[b][0][a][1], ds[b][0][a][2]-t0, c=mc.XKCD_COLORS[mc.XKCD_COLORS.keys()[b]], marker='.', markersize=1, alpha=0.33 )#mkr.MarkerStyle(b), alpha=0.25) #Plot start
     ax.scatter( de[b][0][a][0], de[b][0][a][1], de[b][0][a][2]-t0, c=mc.XKCD_COLORS[mc.XKCD_COLORS.keys()[b*2]], marker='.', markersize=1, alpha=0.33 )#mkr.MarkerStyle(b), alpha=0.25) #Plot end
@@ -59,7 +60,7 @@ plt.clf()
 exit()
 #2D connections diagram
 #Draw lines to mark the MPI ranks
-for ii in xrange(np.max([start['A'],start['B']])):
+for ii in range(np.max([start['A'],start['B']])):
   plt.axhline(ii, xmin=0, xmax=1, linewidth=0.5)
 
 #Draw lines between the start and end for reducing 2 data sets

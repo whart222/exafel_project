@@ -1,4 +1,5 @@
 from __future__ import division
+from six.moves import range
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,7 +34,7 @@ plt.clf()
 
 #2D connections diagram
 #Draw lines to mark the MPI ranks
-for ii in xrange(np.max([start['A'],start['B']])):
+for ii in range(np.max([start['A'],start['B']])):
   plt.axhline(ii, xmin=0, xmax=1, linewidth=0.5)
 
 #Draw lines between the start and end for reducing 2 data sets

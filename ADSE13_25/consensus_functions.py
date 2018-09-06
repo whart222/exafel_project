@@ -1,4 +1,5 @@
 from __future__ import division
+from six.moves import range
 from cctbx.array_family import flex
 from libtbx import group_args
 import os
@@ -186,7 +187,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
     import matplotlib.pyplot as plt
     #from IPython import embed; embed()
     plt.plot(CM.rho, CM.delta, "r.", markersize=3.)
-    for x in xrange(NN):
+    for x in range(NN):
       if CM.cluster_id_maxima[x] >=0:
         plt.plot([CM.rho[x]], [CM.delta[x]], "ro")
     plt.show()
@@ -195,7 +196,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
     import matplotlib.pyplot as plt
     colors = [appcolors[i%10] for i in CM.cluster_id_full]
     plt.scatter(coord_x, coord_y, marker='o', color=colors, linewidth=0.4, edgecolor='k')
-    for i in xrange(n_cluster):
+    for i in range(n_cluster):
       item = flex.first_index(CM.cluster_id_maxima, i)
       plt.plot([cells[item].uc[0]], cells[item].uc[1], 'y.')
       plt.axes().set_aspect("equal")
@@ -283,7 +284,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         stretch_plot_factor = 1.05 # (1+fraction of limits by which xlim,ylim should be set)
         import matplotlib.pyplot as plt
         plt.plot(CM_ori.rho, CM_ori.delta, "r.", markersize=3.)
-        for x in xrange(len(list(CM_ori.cluster_id_final))):
+        for x in range(len(list(CM_ori.cluster_id_final))):
           if CM_ori.cluster_id_maxima[x] >=0:
             plt.plot([CM_ori.rho[x]], [CM_ori.delta[x]], "ro")
         #from IPython import embed; embed();

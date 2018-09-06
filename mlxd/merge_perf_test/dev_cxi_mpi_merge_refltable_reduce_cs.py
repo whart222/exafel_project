@@ -6,6 +6,7 @@ import sys
 # LIBTBX_SET_DISPATCHER_NAME dev.cxi.mpi_merge_refltable_reduce
 #
 # $Id$
+from six.moves import range
 
 from xfel.merging.command_line.dev_mpi_cluster_two_merge import scaling_manager_mpi, Script
 from xfel.merging.command_line.dev_cxi_merge_refltable import refltable_scaling_manager
@@ -164,7 +165,7 @@ class Script(base_Script):
 
     if timing: print "SCALER_WORKERS START RANK=%d TIME=%f"%(rank,tt())
     if rank == 0:
-      for ix in xrange(len(tar_file_names)):
+      for ix in range(len(tar_file_names)):
         if timing: print "SCALER_WORKER_RECV START=%d RANK=%d TIME=%f"%(ix,rank,tt())
         rankreq = comm.recv(source=MPI.ANY_SOURCE)
         if timing: print "SCALER_WORKER_RECV START=%d RANK=%d TIME=%f"%(ix,rank,tt())

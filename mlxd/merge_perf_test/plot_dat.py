@@ -1,4 +1,5 @@
 from __future__ import division
+from six.moves import range
 import numpy as np
 from matplotlib import pyplot as plt
 import os
@@ -19,7 +20,7 @@ dat = np.loadtxt('mpi_perf.dat',dtype={'names':('label','rank','t0','tend'), 'fo
 dat_s=np.array([]);
 dat_f=np.array([]);
 
-for ii in xrange(len(dat)):
+for ii in range(len(dat)):
     dat_s = np.append(dat_s,(dat[ii][2] - dat[0][2]))
     dat_f = np.append(dat_f,(dat[ii][3] - dat[0][2]))
 
