@@ -84,7 +84,6 @@ class clustering_manager(group_args):
       if cluster_id[x] >= 0:
         print ("XC", x,cluster_id[x], rho[x], delta[x])
     self.cluster_id_maxima = cluster_id.deep_copy()
-    #import pdb; pdb.set_trace()
     R.cluster_assignment(rho_order, cluster_id)
     self.cluster_id_full = cluster_id.deep_copy()
 
@@ -253,7 +252,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
           Dij_ori[cluster][N_samples_in_cluster*j+i] = dij_ori
 
     # Now do the orientational cluster analysis
-    d_c_ori = 0.13
+    d_c_ori = 0.13 # 0.13
     from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding
     #plot_with_dimensional_embedding(1-Dij_ori[1]/flex.max(Dij_ori[1]), show_plot=True)
     A_matrices = []
@@ -279,6 +278,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         A_direct = sqr(crystal_orientation.reciprocal_matrix()).transpose().inverse()
         A_matrices.append(A_direct)
         print ("IOTA: Direct A matrix 1st element of orientational cluster %d  = %12.6f"%(i,A_direct[0]))
+        print (A_direct)
       if show_plot:
         # Decision graph
         stretch_plot_factor = 1.05 # (1+fraction of limits by which xlim,ylim should be set)

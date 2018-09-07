@@ -300,6 +300,12 @@ class iota_indexer(stills_indexer):
     reflections['miller_index'] = flex.miller_index(list(hkl))
     reflections['fractional_miller_index'] = hkl_frac
     reflections.set_flags(reflections['miller_index'] != (0,0,0), reflections.flags.indexed)
+    reflections['id'].set_selected(flex.size_t(range(len(reflections))), 0)
+    # Add predicted reflections
+    from dials.algorithms.refinement.prediction import ExperimentsPredictor
+    ref_predictor = ExperimentsPredictor(experiments, force_stills=experiments.all_stills())
+    reflections = ref_predictor(reflections)
+    reflections['id'].set_selected(flex.size_t(range(len(reflections))), -1)
 
 
 

@@ -60,6 +60,10 @@ iota {
     min_indexed_spots = 16
       .type = int
       .help = minimum number of spots that should be indexed on an image by a model
+    align_calc_spots_with_obs = True
+      .type = bool
+      .help = if True, adjusts detector distance to try minimize rcalc-robs for unrefined indexing \
+              results.
 
   }
 }
@@ -381,6 +385,29 @@ class Processor_iota(Processor):
               reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist_centroid)
               experiments_centroid = explist_centroid
               indexed_centroid = reidxr.reflections
+
+              if self.params.iota.random_sub_sampling.align_calc_spots_with_obs:
+                # Move detector to bring calculated spots onto observed spots.
+                # Only done in radial direction
+                moved_detector = self.move_detector_to_bring_calc_spots_onto_obs(experiments_centroid.detectors()[0], experiments_centroid.beams()[0], indexed_centroid)
+                # Reindex everything again with new detector distance!
+                explist_centroid = ExperimentList()
+                for i,imageset in enumerate(imagesets):
+                  imageset.set_detector(moved_detector)
+                  exp = Experiment(imageset=imageset,
+                                 beam=imageset.get_beam(),
+                                 detector=imageset.get_detector(),
+                                 goniometer=imageset.get_goniometer(),
+                                 scan=imageset.get_scan(),
+                                 crystal=known_crystal_models[crystal_model])
+                  explist_centroid.append(exp)
+
+                from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
+                reidxr = iota_indexer(union_observed, imagesets,params=self.params)
+                reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist_centroid)
+                experiments_centroid = explist_centroid
+                indexed_centroid = reidxr.reflections
+
               indexed_centroid['id'].set_selected(flex.size_t(range(len(indexed_centroid))), crystal_model)
               print ('finished evaluating centroid indexing results for crystal model ',crystal_model)
               # Now index with each each experimental model for each of the unioned observations
@@ -403,13 +430,14 @@ class Processor_iota(Processor):
                   cryst_tmp_ori_best=cryst_tmp_ori.change_basis(best_similarity_transform)
                   obs.crystals()[0].set_A(cryst_tmp_ori_best.reciprocal_matrix())
 
-                  exp = Experiment(imageset=imageset,
+                  for i,imageset in enumerate(imagesets):
+                    exp = Experiment(imageset=imageset,
                                    beam=imageset.get_beam(),
                                    detector=imageset.get_detector(),
                                    goniometer=imageset.get_goniometer(),
                                    scan=imageset.get_scan(),
                                    crystal=obs.crystals()[0])
-                  explist.append(exp)
+                    explist.append(exp)
                   reidxr = iota_indexer(union_observed, imagesets,params=self.params)
                   reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist)
                   experiments_tmp = explist
@@ -450,17 +478,16 @@ class Processor_iota(Processor):
                               kfrac.sample_standard_deviation()*kfrac.sample_standard_deviation()+ \
                               lfrac.sample_standard_deviation()*lfrac.sample_standard_deviation()
                   dh_cutoff = math.sqrt(dh_cutoff)*Z_cutoff
-                  #import pdb; pdb.set_trace()
                   panel = experiments_centroid.detectors()[0][0]
                   beam = experiments_centroid.beams()[0]
                   resolution = panel.get_resolution_at_pixel(beam.get_s0(),refl['xyzobs.px.value'][0:2])
                   print ('MILLER_INDEX_DH_STATS', refl['miller_index'], ' ',dh,' ',dh_cutoff,' ',resolution)
-                  #if refl['miller_index'] == (22,6,1):
+
+                  #self.refine(all_experiments_tmp, all_indexed_tmp)
                   #from IPython import embed; embed(); exit()
                   if dh < dh_cutoff and refl['miller_index'] != (0,0,0):
                     indexed_spots_idx.append(ii)
                 # Make sure the number of spots indexed by a model is above a threshold
-                #import pdb; pdb.set_trace()
                 if len(indexed_centroid.select(flex.size_t(indexed_spots_idx))) > self.params.iota.random_sub_sampling.min_indexed_spots:
                   indexed.extend(indexed_centroid.select(flex.size_t(indexed_spots_idx)))
                   # Need to append properly
@@ -484,7 +511,6 @@ class Processor_iota(Processor):
             # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
             self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
             self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
-            #self.refine(all_experiments_tmp, all_indexed_tmp)
             # Perform refinement and outlier rejection
             from exafel_project.ADSE13_25.refinement.iota_refiner import iota_refiner
             refiner=iota_refiner(experiments, indexed, imagesets,self.params)
@@ -646,6 +672,30 @@ class Processor_iota(Processor):
     logger.info('Time Taken = %f seconds' % (time() - st))
     return experiments, indexed
 
+  def move_detector_to_bring_calc_spots_onto_obs(self, detector, beam, indexed):
+    ''' Function moves detector to ensure that radially the gap between rcalc and robs is minimized
+        calculated for each spot using dnew = ((robs-r0)/(rcal-r0))*d  and then mean is taken of dnew values
+        Code only works for a single detector right now. Multiple detectors will fail'''
+    import copy
+    from scitbx.matrix import col
+    from scitbx.array_family import flex
+    moved_detector = copy.deepcopy(detector)
+    dnew = flex.double() # list to store all the dnew values
+    r0 = col(detector.get_ray_intersection(beam.get_s0())[1])  # beam center
+    for ii in range(len(indexed)):
+      panel_num = indexed[ii]['panel']
+      panel = detector[panel_num]
+      D = panel.get_origin()[-1]
+      rcal = col(indexed[ii]['xyzcal.mm'][0:2]) - r0
+      robs = col(indexed[ii]['xyzobs.mm.value'][0:2]) - r0
+      dnew.append((robs.length()/rcal.length())*D)
+
+    new_distance = flex.mean(dnew)
+    for panel in moved_detector:
+      orix,oriy,oriz = panel.get_origin()
+      new_origin = tuple((orix,oriy,new_distance))
+      panel.set_frame(panel.get_fast_axis(), panel.get_slow_axis(), new_origin )
+    return moved_detector
 
 if __name__ == '__main__':
   from dials.util import halraiser
