@@ -1,0 +1,10 @@
+Script stills_process_modified.py to evaluate how much the detector needs to be moved
+to best align calculated spots with observed. 
+
+Follow these steps - 
+
+1. Run sbatch.sh (see instructions there on setting DIALS path and IMAGE_PATH)
+2. Look for the word NEW_DET_DISTANCE in the stdout on the screen (or piped to a log)
+   For image 64, I got NEW_DET_DISTANCE = -140.681784062. Correct answer is -141.7.
+   
+   Please use the phil file provided in this folder as it turns off all kinds of refinement (i.e candidate refinement, outlier rejection and no refinement of best candidate after indexing)

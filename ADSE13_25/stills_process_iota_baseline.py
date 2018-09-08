@@ -389,7 +389,9 @@ class Processor_iota(Processor):
               if self.params.iota.random_sub_sampling.align_calc_spots_with_obs:
                 # Move detector to bring calculated spots onto observed spots.
                 # Only done in radial direction
-                moved_detector = self.move_detector_to_bring_calc_spots_onto_obs(experiments_centroid.detectors()[0], experiments_centroid.beams()[0], indexed_centroid)
+                assert len(experiments_centroid.detectors()) == 1, 'aligning spots only work with one detector'
+                image_identifier = imagesets[0].get_image_identifier(0)
+                moved_detector = self.move_detector_to_bring_calc_spots_onto_obs(experiments_centroid.detectors()[0], experiments_centroid.beams()[0], indexed_centroid, image_identifier)
                 # Reindex everything again with new detector distance!
                 explist_centroid = ExperimentList()
                 for i,imageset in enumerate(imagesets):
@@ -672,7 +674,7 @@ class Processor_iota(Processor):
     logger.info('Time Taken = %f seconds' % (time() - st))
     return experiments, indexed
 
-  def move_detector_to_bring_calc_spots_onto_obs(self, detector, beam, indexed):
+  def move_detector_to_bring_calc_spots_onto_obs(self, detector, beam, indexed,image_identifier):
     ''' Function moves detector to ensure that radially the gap between rcalc and robs is minimized
         calculated for each spot using dnew = ((robs-r0)/(rcal-r0))*d  and then mean is taken of dnew values
         Code only works for a single detector right now. Multiple detectors will fail'''
@@ -691,6 +693,7 @@ class Processor_iota(Processor):
       dnew.append((robs.length()/rcal.length())*D)
 
     new_distance = flex.mean(dnew)
+    print ('NEW_DET_DISTANCE ',new_distance, ' ',image_identifier[-28:])
     for panel in moved_detector:
       orix,oriy,oriz = panel.get_origin()
       new_origin = tuple((orix,oriy,new_distance))

@@ -1,0 +1,27 @@
+spotfinder {
+  threshold {
+    dispersion {
+      gain=1.47
+    }
+  }
+  filter {
+    min_spot_size=2
+  }
+}
+
+indexing {
+  method=fft1d
+  known_symmetry {
+    unit_cell=67.200,59.800,47.200,90.00,110.30,90.00
+    space_group=C2
+  }
+}
+integration {
+  debug {
+    output=True
+    separate_files=False
+  }
+}
+indexing.stills.candidate_outlier_rejection=False
+indexing.stills.refine_all_candidates=False
+indexing.refinement_protocol.mode=repredict_only
