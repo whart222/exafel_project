@@ -390,6 +390,8 @@ class Processor_iota(Processor):
                 # Move detector to bring calculated spots onto observed spots.
                 # Only done in radial direction
                 assert len(experiments_centroid.detectors()) == 1, 'aligning spots only work with one detector'
+                import copy
+                original_detector = copy.deepcopy(experiments_centroid.detectors()[0])
                 image_identifier = imagesets[0].get_image_identifier(0)
                 moved_detector = self.move_detector_to_bring_calc_spots_onto_obs(experiments_centroid.detectors()[0], experiments_centroid.beams()[0], indexed_centroid, image_identifier)
                 # Reindex everything again with new detector distance!
@@ -495,6 +497,12 @@ class Processor_iota(Processor):
                   # Need to append properly
                   for iexpt,expt in enumerate(experiments_centroid):
                     print ('APPENDING EXPERIMENT = ',crystal_model,iexpt)
+                    # If detector was moved to align calculated spots with observed then
+                    # restore the original distance i.e detector model
+                    # Setting it in both imageset and detector as not sure which one is used downstream
+                    if self.params.iota.random_sub_sampling.align_calc_spots_with_obs:
+                      expt.imageset.set_detector(original_detector)
+                      expt.detector = original_detector
                     experiments.append(expt)
 
               except Exception:
