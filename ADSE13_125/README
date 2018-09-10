@@ -1,0 +1,12 @@
+Scripts for running IOTA demo on Cori KNL
+
+Metrics to assess - 
+
+1. How much more computationally intensive
+2. Show 2 FOMs: CC1/2 and CCano
+
+Initial scripts courtesy Mona <monarin@stanford.edu>.
+
+
+Contact: Asmit Bhowmick <abhowmick@lbl.gov>
+         Nick Sauter <nksauter@lbl.gov>
