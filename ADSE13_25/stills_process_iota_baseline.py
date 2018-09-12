@@ -11,7 +11,6 @@ from libtbx.phil import parse
 
 from dials.command_line.stills_process import control_phil_str, dials_phil_str, program_defaults_phil_str
 from dials.command_line.stills_process import do_import, Script, Processor
-from exafel_project.ADSE13_25.clustering.consensus_functions import clustering_iota_phil_str
 
 logger = logging.getLogger('stills_process_iota')
 

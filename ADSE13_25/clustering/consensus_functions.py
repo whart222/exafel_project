@@ -17,10 +17,10 @@ clustering {
     .help = cutoff for delta values used in clustering. All mediods have to be above this cutoff in delta values
   d_c = 6.13
     .type = float
-    .help = d_c parameter used during clustering by unit cell dimensions 
+    .help = d_c parameter used during clustering by unit cell dimensions
   d_c_ori = 0.13
     .type = float
-    .help = d_c parameter used during clustering by orientational matrix A 
+    .help = d_c parameter used during clustering by orientational matrix A
   max_percentile_rho_uc = 0.95
     .type = float
     .help = rho of a data point needs to be above this value to be considered a mediod during uc clustering
@@ -127,7 +127,7 @@ class clustering_manager(group_args):
 
 def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_only_first_indexed_model=False,finalize_method = 'reindex_with_known_crystal_models', clustering_params = None):
   '''
-  Uses the Rodriguez Laio 2014 method to do a hierarchical clustering of the crystal models and 
+  Uses the Rodriguez Laio 2014 method to do a hierarchical clustering of the crystal models and
   then vote for the highest consensus crystal mode. Input needs to be a list of experiments object.
   Clustering code taken from github.com/cctbx-xfel/cluster_regression
   Clustering is first done first based on unit cell dimensions. Then for each of the clusters identified,
