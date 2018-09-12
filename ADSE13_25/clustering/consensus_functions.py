@@ -2,6 +2,7 @@ from __future__ import division
 from six.moves import range
 from cctbx.array_family import flex
 from libtbx import group_args
+from libtbx.phil import parse
 import os
 #
 # List of consensus functions to be implemented
@@ -9,6 +10,27 @@ import os
 # 2. orientational
 # 3. spot clique
 #
+clustering_iota_phil_str = '''
+clustering {
+  Z_delta = 2.0
+    .type = float
+    .help = cutoff for delta values used in clustering. All mediods have to be above this cutoff in delta values
+  d_c = 6.13
+    .type = float
+    .help = d_c parameter used during clustering by unit cell dimensions 
+  d_c_ori = 0.13
+    .type = float
+    .help = d_c parameter used during clustering by orientational matrix A 
+  max_percentile_rho_uc = 0.95
+    .type = float
+    .help = rho of a data point needs to be above this value to be considered a mediod during uc clustering
+  max_percentile_rho_ori = 0.85
+    .type = float
+    .help = rho of a data point needs to be above this value to be considered a mediod during orientational clustering
+}
+
+'''
+clustering_iota_scope = parse(clustering_iota_phil_str)
 
 def get_dij_ori(cryst1, cryst2, is_reciprocal=True):
   '''
@@ -41,7 +63,6 @@ class clustering_manager(group_args):
     print ('finished Dij, now calculating rho_i and density')
     from xfel.clustering import Rodriguez_Laio_clustering_2014 as RL
     R = RL(distance_matrix = self.Dij, d_c = self.d_c)
-    #from IPython import embed; embed()
     #from clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding
     #plot_with_dimensional_embedding(1-self.Dij/flex.max(self.Dij), show_plot=True)
     self.rho = rho = R.get_rho()
@@ -104,11 +125,13 @@ class clustering_manager(group_args):
     #      cluster_id.set_selected(too_sparse,-1)
     self.cluster_id_final = cluster_id.deep_copy()
 
-def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_only_first_indexed_model=False,finalize_method = 'reindex_with_known_crystal_models'):
+def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_only_first_indexed_model=False,finalize_method = 'reindex_with_known_crystal_models', clustering_params = None):
   '''
-  Uses the Rodriguez Laio 2014 method to do a clustering of the unit cells and then vote for the highest
-  consensus unit cell. Input needs to be a list of experiments object.
+  Uses the Rodriguez Laio 2014 method to do a hierarchical clustering of the crystal models and 
+  then vote for the highest consensus crystal mode. Input needs to be a list of experiments object.
   Clustering code taken from github.com/cctbx-xfel/cluster_regression
+  Clustering is first done first based on unit cell dimensions. Then for each of the clusters identified,
+  a further clustering is done based on orientational matrix A
   '''
   cells = []
 
@@ -116,6 +139,9 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   # Flag for testing Lysozyme data from NKS.Make sure cluster_regression repository is present and configured
   # Program will exit after plots are displayed if this flag is true
   test_nks = False
+  if clustering_params is None:
+    clustering_params = clustering_iota_scope
+
   if test_nks:
     from cctbx import crystal
     import libtbx.load_env
@@ -167,8 +193,8 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   from cctbx.uctbx.determine_unit_cell import NCDist_flatten
   Dij = NCDist_flatten(MM_double)
   from scitbx.math import five_number_summary
-  d_c = 6.13 #five_number_summary(list(Dij))[1]
-  CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=0.95)
+  d_c = clustering_params.d_c #five_number_summary(list(Dij))[1]
+  CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=clustering_params.max_percentile_rho_uc)
   n_cluster = 1+flex.max(CM.cluster_id_final)
   print (len(cells), ' datapoints have been analyzed')
   print ('%d CLUSTERS'%n_cluster)
@@ -252,7 +278,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
           Dij_ori[cluster][N_samples_in_cluster*j+i] = dij_ori
 
     # Now do the orientational cluster analysis
-    d_c_ori = 0.13 # 0.13
+    d_c_ori = clustering_params.d_c_ori # 0.13
     from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding
     #plot_with_dimensional_embedding(1-Dij_ori[1]/flex.max(Dij_ori[1]), show_plot=True)
     A_matrices = []
@@ -260,7 +286,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       #if cluster == 2:
       #  CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85, debug=True)
       #else:
-      CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85)
+      CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=clustering_params.max_percentile_rho_ori, Z_delta=clustering_params.Z_delta)
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       for i in range(n_cluster_ori):
         item = flex.first_index(CM_ori.cluster_id_maxima, i)

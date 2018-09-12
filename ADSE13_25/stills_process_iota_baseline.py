@@ -11,6 +11,7 @@ from libtbx.phil import parse
 
 from dials.command_line.stills_process import control_phil_str, dials_phil_str, program_defaults_phil_str
 from dials.command_line.stills_process import do_import, Script, Processor
+from exafel_project.ADSE13_25.clustering.consensus_functions import clustering_iota_phil_str
 
 logger = logging.getLogger('stills_process_iota')
 
@@ -31,7 +32,7 @@ iota {
     ntrials = 10
       .type = int
       .help = Number of random sub-samples to be selected
-    fraction_sub_sample = 0.2
+    fraction_sub_sample = 0.8
       .type = float
       .help = fraction of sample to be sub-sampled. Should be between 0 and 1
     consensus_function = *unit_cell
@@ -66,6 +67,7 @@ iota {
               results.
 
   }
+  include scope exafel_project.ADSE13_25.clustering.consensus_functions.clustering_iota_scope
 }
 '''
 
@@ -100,7 +102,7 @@ class Script_iota(Script):
     import copy
 
     #Parse command line
-    params, options, all_paths = self.parser.parse_args(show_diff_phil=False, return_unhandled=True, quick_parse=True)
+    params, options, all_paths = self.parser.parse_args(show_diff_phil=True, return_unhandled=True, quick_parse=True)
 
     # Check we have some filenames
     if not all_paths:
@@ -325,8 +327,8 @@ class Processor_iota(Processor):
             except Exception:
               print('Indexing failed for some reason')
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
-            from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get_consensus
-            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method)
+            from exafel_project.ADSE13_25.clustering.consensus_functions import get_uc_consensus as get_consensus
+            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering_iota)
           print ('IOTA: Finalizing consensus')
           if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
             print ('IOTA: Chosen finalize method is reindex_with_known_crystal_models')
