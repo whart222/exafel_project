@@ -3,7 +3,6 @@ from __future__ import division
 #
 # LIBTBX_SET_DISPATCHER_NAME cctbx.xfel.xtc_process
 #
-from six.moves import range
 PSANA2_VERSION = 0
 try:
   import psana
@@ -328,6 +327,7 @@ xtc_phil_str = '''
                 which events to process. Some processes will finish early and go    \
                 idle, but no MPI overhead is incurred.
     }
+
   }
   iota {
     method = off *random_sub_sampling
@@ -339,7 +339,7 @@ xtc_phil_str = '''
       ntrials = 10
         .type = int
         .help = Number of random sub-samples to be selected
-      fraction_sub_sample = 0.2
+      fraction_sub_sample = 0.8
         .type = float
         .help = fraction of sample to be sub-sampled. Should be between 0 and 1
       consensus_function = *unit_cell
@@ -353,8 +353,30 @@ xtc_phil_str = '''
         .type = bool
         .help = Flag to indicate if candidate basis vectors should be refined and whether \
                 outlier rejectionis needed
+      finalize_method = union_and_reindex *reindex_with_known_crystal_models
+        .type = choice
+        .help = union_and_reindex will take union of all spots used to obtain \
+                cluster (hence lattice) and then reindex with all the lattice models \
+                of that cluster.\
+                reindex_with_known_crystal_models will just index the spots with \
+                known_orientation_indexer. Useful if clustering fails but indexing \
+                succeeds in limited trials
+      Z_cutoff = 1.0
+        .type = float
+        .help = Z-score cutoff for accepting/rejecting bragg spots based on difference between \
+                fractional and integer hkl. This will be used for finalize_method = union_and_reindex
+      min_indexed_spots = 16
+        .type = int
+        .help = minimum number of spots that should be indexed on an image by a model
+      align_calc_spots_with_obs = True
+        .type = bool
+        .help = if True, adjusts detector distance to try minimize rcalc-robs for unrefined indexing \
+                results.
+
+    }
+    include scope exafel_project.ADSE13_25.clustering.consensus_functions.clustering_iota_scope
   }
-}
+
 '''
 
 from dials.command_line.stills_process import dials_phil_str, program_defaults_phil_str
@@ -499,7 +521,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       psana_mask = flex.bool(psana_mask == 1)
     assert psana_mask.focus() == (32, 185, 388)
     dials_mask = []
-    for i in range(32):
+    for i in xrange(32):
       dials_mask.append(psana_mask[i:i+1,:,:194])
       dials_mask[-1].reshape(flex.grid(185,194))
       dials_mask.append(psana_mask[i:i+1,:,194:])
@@ -517,7 +539,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
           "The following definitions were not recognised" in str(e):
         deprecated_params = ['mask_nonbonded_pixels','gain_mask_value','algorithm','custom_parameterization']
         deprecated_strs = ['%s','%s','common_mode.%s','common_mode.%s']
-        for i in range(len(deprecated_params)):
+        for i in xrange(len(deprecated_params)):
           if deprecated_params[i] in str(e):
             print "format.cbf.%s"%(deprecated_strs[i]%deprecated_params[i]), "has changed to format.cbf.cspad.%s"%(deprecated_strs[i]%deprecated_params[i])
       raise
@@ -746,7 +768,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
             if self.params.format.cbf.cspad.mask_nonbonded_pixels:
               psana_mask = self.psana_det.mask(run.run(),calib=False,status=False,edges=False,central=False,unbond=True,unbondnbrs=True)
               dials_mask = self.psana_mask_to_dials_mask(psana_mask)
-              self.dials_mask = [self.dials_mask[i] & dials_mask[i] for i in range(len(dials_mask))]
+              self.dials_mask = [self.dials_mask[i] & dials_mask[i] for i in xrange(len(dials_mask))]
         else:
           if params.format.cbf.mode == "cspad":
             psana_mask = self.psana_det.mask(run.run(),calib=True,status=True,edges=True,central=True,unbond=True,unbondnbrs=True)
@@ -1195,40 +1217,243 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       self.debug_write("strong_shot_%d"%len(observed), "done")
       return
 
-# --------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+
     # index and refine
     self.debug_write("index_start")
     try:
-      #
-      if self.params.iota.method == 'random_sub_sampling':
-        from scitbx.array_family import flex
-        len_max_indexed = -999
-        experiments_list = []
-        #No outlier rejection or refinement should be done for the candidate basis vectors
-        outlier_rejection_flag=self.params.indexing.stills.candidate_outlier_rejection
-        refine_all_candidates_flag=self.params.indexing.stills.refine_all_candidates
-        if self.params.iota.random_sub_sampling.no_outlier_rejection_and_candidates_refinement:
-          self.params.indexing.stills.candidate_outlier_rejection=False
-          self.params.indexing.stills.refine_all_candidates=False
-        for trial in range(self.params.iota.random_sub_sampling.ntrials):
-          flex.set_random_seed(trial+1001)
-          observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
-          try:
-            print('IOTA:SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']),' ', trial)
-            experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
-            experiments_list.append(experiments_tmp)
-          except Exception:
-            print('Indexing failed for some reason')
-        if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
-          from exafel_project.ADSE13_25.consensus_functions import get_uc_consensus as get_consensus
-          known_crystal_models = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model = True)
-          self.known_crystal_models = known_crystal_models
-          print ('IOTA: Reindexing with best chosen crystal model')
-          # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
-          self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
-          self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
-      #
-      experiments, indexed = self.index(datablock, observed)
+      if self.params.dispatch.index:
+        if self.params.iota.method == 'random_sub_sampling':
+          from scitbx.array_family import flex
+          len_max_indexed = -999
+          experiments_list = []
+          # Add an id for each strong spot observed in the image
+          observed['spot_id'] = flex.size_t(range(len(observed)))
+          # No outlier rejection or refinement should be done for the candidate basis vectors
+          outlier_rejection_flag=self.params.indexing.stills.candidate_outlier_rejection
+          refine_all_candidates_flag=self.params.indexing.stills.refine_all_candidates
+          if self.params.iota.random_sub_sampling.no_outlier_rejection_and_candidates_refinement:
+            self.params.indexing.stills.candidate_outlier_rejection=False
+            self.params.indexing.stills.refine_all_candidates=False
+
+          observed_samples_list = []
+          for trial in range(self.params.iota.random_sub_sampling.ntrials):
+            flex.set_random_seed(trial+1001)
+            observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
+            try:
+              print ('IOTA: SUM_INTENSITY_VALUE',sum(observed_sample['intensity.sum.value']), ' ',trial)
+              if self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
+                experiments_tmp, indexed_tmp = self.index_with_iota(datablock, observed_sample)
+              elif self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
+                experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
+
+              experiments_list.append(experiments_tmp)
+              observed_samples_list.append(observed_sample)
+            except Exception:
+              print('Indexing failed for some reason')
+          if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
+            from exafel_project.ADSE13_25.clustering.consensus_functions import get_uc_consensus as get_consensus
+            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering_iota)
+          print ('IOTA: Finalizing consensus')
+          if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
+            print ('IOTA: Chosen finalize method is reindex_with_known_crystal_models')
+            self.known_crystal_models = known_crystal_models
+            # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
+            self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
+            self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
+            experiments, indexed = self.index(datablock, observed)
+            print('fraction subsampled = %5.2f with %d indexed spots ' %(self.params.iota.random_sub_sampling.fraction_sub_sample,len(indexed)))
+
+          elif self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
+            print ('IOTA: Chosen finalize method is union_and_reindex')
+            # Take union of all spots used to index each lattice cluster
+            from dials.array_family import flex as dials_flex
+            from dxtbx.model.experiment_list import ExperimentList, Experiment
+            indexed = dials_flex.reflection_table()
+            experiments = ExperimentList()
+            sample = {}
+            all_experimental_models = {}
+            for idx,crystal_model in enumerate(clustered_experiments_list):
+              if crystal_model >= 0:
+                if crystal_model not in sample:
+                  sample[crystal_model] = []
+                  all_experimental_models[crystal_model] = []
+                sample[crystal_model].append(observed_samples_list[idx]['spot_id'])
+                all_experimental_models[crystal_model].append(experiments_list[idx])
+            # FIXME take out
+            all_indexed_tmp = dials_flex.reflection_table()
+            all_experiments_tmp = ExperimentList()
+            tmp_counter = 0
+            for crystal_model in sample:
+              # Need to have a minimum number of experiments for correct stats
+              # FIXME number should not be hardcoded. ideally a phil param
+              if len(all_experimental_models[crystal_model]) < 3:
+                continue
+              self.known_crystal_models = None
+              union_indices=flex.union(len(observed), iselections=sample[crystal_model])
+              union_observed = observed.select(union_indices)
+              print ('done taking unions')
+              # First index the union set with the central crystal model of the cluster
+              self.known_crystal_models = None #[known_crystal_models[crystal_model]]
+              from cctbx import crystal
+              imagesets = datablock.extract_imagesets()
+              explist_centroid = ExperimentList()
+              for i,imageset in enumerate(imagesets):
+                exp = Experiment(imageset=imageset,
+                                 beam=imageset.get_beam(),
+                                 detector=imageset.get_detector(),
+                                 goniometer=imageset.get_goniometer(),
+                                 scan=imageset.get_scan(),
+                                 crystal=known_crystal_models[crystal_model])
+                explist_centroid.append(exp)
+
+              from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
+              reidxr = iota_indexer(union_observed, imagesets,params=self.params)
+              reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist_centroid)
+              experiments_centroid = explist_centroid
+              indexed_centroid = reidxr.reflections
+
+              if self.params.iota.random_sub_sampling.align_calc_spots_with_obs:
+                # Move detector to bring calculated spots onto observed spots.
+                # Only done in radial direction
+                assert len(experiments_centroid.detectors()) == 1, 'aligning spots only work with one detector'
+                import copy
+                original_detector = copy.deepcopy(experiments_centroid.detectors()[0])
+                image_identifier = imagesets[0].get_image_identifier(0)
+                moved_detector = self.move_detector_to_bring_calc_spots_onto_obs(experiments_centroid.detectors()[0], experiments_centroid.beams()[0], indexed_centroid, image_identifier)
+                # Reindex everything again with new detector distance!
+                explist_centroid = ExperimentList()
+                for i,imageset in enumerate(imagesets):
+                  imageset.set_detector(moved_detector)
+                  exp = Experiment(imageset=imageset,
+                                 beam=imageset.get_beam(),
+                                 detector=imageset.get_detector(),
+                                 goniometer=imageset.get_goniometer(),
+                                 scan=imageset.get_scan(),
+                                 crystal=known_crystal_models[crystal_model])
+                  explist_centroid.append(exp)
+
+                from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
+                reidxr = iota_indexer(union_observed, imagesets,params=self.params)
+                reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist_centroid)
+                experiments_centroid = explist_centroid
+                indexed_centroid = reidxr.reflections
+
+              indexed_centroid['id'].set_selected(flex.size_t(range(len(indexed_centroid))), crystal_model)
+              print ('finished evaluating centroid indexing results for crystal model ',crystal_model)
+              # Now index with each each experimental model for each of the unioned observations
+              dh_list = flex.double()
+              failed_model_counter = 0
+              hkl_all_values = {}
+              for obs in all_experimental_models[crystal_model]:
+                try:
+                  explist = ExperimentList()
+                  self.known_crystal_models = None #[obs.crystals()[0]]
+
+                  # Make sure the crystal is rotated using the best_similarity_transformation
+                  # with respect to the centroid model. Otherwise dh values will be junk
+                  from cctbx_orientation_ext import crystal_orientation
+                  cryst_ref_ori = crystal_orientation(explist_centroid.crystals()[0].get_A(), True)
+                  cryst_tmp_ori = crystal_orientation(obs.crystals()[0].get_A(), True)
+                  best_similarity_transform = cryst_tmp_ori.best_similarity_transformation(
+                    other = cryst_ref_ori, fractional_length_tolerance = 10.00,
+                    unimodular_generator_range=1)
+                  cryst_tmp_ori_best=cryst_tmp_ori.change_basis(best_similarity_transform)
+                  obs.crystals()[0].set_A(cryst_tmp_ori_best.reciprocal_matrix())
+
+                  for i,imageset in enumerate(imagesets):
+                    exp = Experiment(imageset=imageset,
+                                   beam=imageset.get_beam(),
+                                   detector=imageset.get_detector(),
+                                   goniometer=imageset.get_goniometer(),
+                                   scan=imageset.get_scan(),
+                                   crystal=obs.crystals()[0])
+                    explist.append(exp)
+                  reidxr = iota_indexer(union_observed, imagesets,params=self.params)
+                  reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist)
+                  experiments_tmp = explist
+                  indexed_tmp = reidxr.reflections
+                  # FIXME take out
+
+                  indexed_tmp['id'].set_selected(flex.size_t(range(len(indexed_tmp))),tmp_counter)
+                  all_indexed_tmp.extend(indexed_tmp)
+                  all_experiments_tmp.append(exp)
+                  tmp_counter +=1
+
+                  # find dh = |h_frac - h_centroid|
+                  indexed_idxlist = [idx for idx,elem in enumerate(indexed_tmp['xyzobs.mm.value'])
+                                     if elem in indexed_centroid['xyzobs.mm.value']]
+                  dh_list_tmp = flex.double()
+                  for idx in indexed_idxlist:
+                    centroid_list_idx = list(indexed_centroid['xyzobs.mm.value']).index(indexed_tmp['xyzobs.mm.value'][idx])
+                    x = indexed_centroid['miller_index'][centroid_list_idx]
+                    y = indexed_tmp['fractional_miller_index'][idx]
+                    if indexed_centroid['miller_index'][centroid_list_idx] not in hkl_all_values:
+                      hkl_all_values[indexed_centroid['miller_index'][centroid_list_idx]] = flex.vec3_double()
+                    hkl_all_values[indexed_centroid['miller_index'][centroid_list_idx]].append(y)
+                    if x == (0,0,0): continue
+                  print ('finished evaluating dh_list for crystal model ',crystal_model)
+                except Exception as e:
+                  print ('Reindexing with candidate lattices on union set failed')
+              # Get a sense of the variability in dh. Assign Z-score cutoff from there
+              try:
+                Z_cutoff = self.params.iota.random_sub_sampling.Z_cutoff
+                # Now go through the spots indexed by the cluster center and reject if dh greater than Z_cutoff
+                indexed_spots_idx = []
+                for ii,refl in enumerate(indexed_centroid):
+                  dh = flex.double([refl['miller_index'][0]-refl['fractional_miller_index'][0],
+                                refl['miller_index'][1]-refl['fractional_miller_index'][1],
+                                refl['miller_index'][2]-refl['fractional_miller_index'][2]]).norm()
+                  hfrac,kfrac,lfrac = hkl_all_values[refl['miller_index']].parts()
+                  dh_cutoff = hfrac.sample_standard_deviation()*hfrac.sample_standard_deviation()+ \
+                              kfrac.sample_standard_deviation()*kfrac.sample_standard_deviation()+ \
+                              lfrac.sample_standard_deviation()*lfrac.sample_standard_deviation()
+                  dh_cutoff = math.sqrt(dh_cutoff)*Z_cutoff
+                  panel = experiments_centroid.detectors()[0][0]
+                  beam = experiments_centroid.beams()[0]
+                  resolution = panel.get_resolution_at_pixel(beam.get_s0(),refl['xyzobs.px.value'][0:2])
+                  print ('MILLER_INDEX_DH_STATS', refl['miller_index'], ' ',dh,' ',dh_cutoff,' ',resolution)
+
+                  #self.refine(all_experiments_tmp, all_indexed_tmp)
+                  #from IPython import embed; embed(); exit()
+                  if dh < dh_cutoff and refl['miller_index'] != (0,0,0):
+                    indexed_spots_idx.append(ii)
+                # Make sure the number of spots indexed by a model is above a threshold
+                if len(indexed_centroid.select(flex.size_t(indexed_spots_idx))) > self.params.iota.random_sub_sampling.min_indexed_spots:
+                  indexed.extend(indexed_centroid.select(flex.size_t(indexed_spots_idx)))
+                  # Need to append properly
+                  for iexpt,expt in enumerate(experiments_centroid):
+                    print ('APPENDING EXPERIMENT = ',crystal_model,iexpt)
+                    # If detector was moved to align calculated spots with observed then
+                    # restore the original distance i.e detector model
+                    # Setting it in both imageset and detector as not sure which one is used downstream
+                    if self.params.iota.random_sub_sampling.align_calc_spots_with_obs:
+                      expt.imageset.set_detector(original_detector)
+                      expt.detector = original_detector
+                    experiments.append(expt)
+
+              except Exception:
+                print ('dh_list calculation and outlier rejection failed')
+
+            # Make sure crytal model numbers are in sequence, example 0,1,2 instead of 0,2,3
+            # when model 1 was not used for consensus part. Otherwise refine won't work
+            max_id = flex.max(indexed['id'])
+            original_ids = []
+            for iid in range(0,max_id+1):
+              if len(indexed.select(indexed['id']==iid)) != 0:
+                original_ids.append(iid)
+
+            for ii,iid in enumerate(original_ids):
+              indexed['id'].set_selected(indexed['id'] == iid,ii)
+            # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
+            self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
+            self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
+            # Perform refinement and outlier rejection
+            from exafel_project.ADSE13_25.refinement.iota_refiner import iota_refiner
+            refiner=iota_refiner(experiments, indexed, imagesets,self.params)
+            experiments,indexed = refiner.run_refinement_and_outlier_rejection()
+        else:
+          experiments, indexed = self.index(datablock, observed)
     except Exception as e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
@@ -1246,7 +1471,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       for expt_id, expt in enumerate(experiments):
         expt.imageset = imgset
 
-# --------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
     self.debug_write("refine_start")
 
     try:
@@ -1323,6 +1548,96 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       print "Warning, couldn't save image:", dest_path
 
     return dest_path
+
+  def index_with_iota(self, datablock, reflections):
+    from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
+    from time import time
+    import copy
+    st = time()
+
+    logger.info('*' * 80)
+    logger.info('Indexing Strong Spots')
+    logger.info('*' * 80)
+
+    imagesets = datablock.extract_imagesets()
+
+    params = copy.deepcopy(self.params)
+    # don't do scan-varying refinement during indexing
+    params.refinement.parameterisation.scan_varying = False
+
+    if hasattr(self, 'known_crystal_models'):
+      known_crystal_models = self.known_crystal_models
+    else:
+      known_crystal_models = None
+
+    if params.indexing.stills.method_list is None:
+      idxr = iota_indexer.from_parameters(
+        reflections, imagesets, known_crystal_models=known_crystal_models,
+        params=params)
+      idxr.index()
+    else:
+      indexing_error = None
+      for method in params.indexing.stills.method_list:
+        params.indexing.method = method
+        try:
+          idxr = iota_indexer.from_parameters(
+            reflections, imagesets,
+            params=params)
+          idxr.index()
+        except Exception as e:
+          logger.info("Couldn't index using method %s"%method)
+          if indexing_error is None:
+            if e is None:
+              e = Exception("Couldn't index using method %s"%method)
+            indexing_error = e
+        else:
+          indexing_error = None
+          break
+      if indexing_error is not None:
+        raise indexing_error
+
+    indexed = idxr.reflections
+    experiments = idxr.experiments
+
+    if known_crystal_models is not None:
+      from dials.array_family import flex
+      filtered = flex.reflection_table()
+      for idx in set(indexed['miller_index']):
+        sel = indexed['miller_index'] == idx
+        if sel.count(True) == 1:
+          filtered.extend(indexed.select(sel))
+      logger.info("Filtered duplicate reflections, %d out of %d remaining"%(len(filtered),len(indexed)))
+      print("Filtered duplicate reflections, %d out of %d remaining"%(len(filtered),len(indexed)))
+      indexed = filtered
+
+    logger.info('')
+    logger.info('Time Taken = %f seconds' % (time() - st))
+    return experiments, indexed
+
+  def move_detector_to_bring_calc_spots_onto_obs(self, detector, beam, indexed,image_identifier):
+    ''' Function moves detector to ensure that radially the gap between rcalc and robs is minimized
+        calculated for each spot using dnew = ((robs-r0)/(rcal-r0))*d  and then mean is taken of dnew values
+        Code only works for a single detector right now. Multiple detectors will fail'''
+    import copy
+    from scitbx.matrix import col
+    from scitbx.array_family import flex
+    moved_detector = copy.deepcopy(detector)
+    dnew = flex.double() # list to store all the dnew values
+    r0 = col(detector.get_ray_intersection(beam.get_s0())[1])  # beam center
+    for ii in range(len(indexed)):
+      panel_num = indexed[ii]['panel']
+      panel = detector[panel_num]
+      D = panel.get_origin()[-1]
+      rcal = col(indexed[ii]['xyzcal.mm'][0:2]) - r0
+      robs = col(indexed[ii]['xyzobs.mm.value'][0:2]) - r0
+      dnew.append((robs.length()/rcal.length())*D)
+
+    new_distance = flex.mean(dnew)
+    print ('NEW_DET_DISTANCE ',new_distance, ' ',image_identifier[-28:])
+    for panel in moved_detector:
+      orix,oriy,oriz = panel.get_origin()
+      new_origin = tuple((orix,oriy,new_distance))
+      panel.set_frame(panel.get_fast_axis(), panel.get_slow_axis(), new_origin )
 
   def cache_ranges(self, dxtbx_img, min_val, max_val):
     """ Save the current trusted ranges, and replace them with the given overrides, if present.
