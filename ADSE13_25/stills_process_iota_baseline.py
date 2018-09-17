@@ -325,9 +325,17 @@ class Processor_iota(Processor):
               observed_samples_list.append(observed_sample)
             except Exception:
               print('Indexing failed for some reason')
+          from libtbx.easy_pickle import dump,load
+          dump('experiments_list.pickle', experiments_list)
+          dump('observed_samples_list.pickle', observed_samples_list)
+          from libtbx.easy_pickle import load
+          #exit()
+          #experiments_list = load('experiments_list.pickle')
+          #observed_samples_list = load('observed_samples_list.pickle')
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
             from exafel_project.ADSE13_25.clustering.consensus_functions import get_uc_consensus as get_consensus
-            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering_iota)
+            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering)
+         # from IPython import embed; embed(); exit()
           print ('IOTA: Finalizing consensus')
           if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
             print ('IOTA: Chosen finalize method is reindex_with_known_crystal_models')
@@ -468,7 +476,7 @@ class Processor_iota(Processor):
                     if x == (0,0,0): continue
                   print ('finished evaluating dh_list for crystal model ',crystal_model)
                 except Exception as e:
-                  print ('Reindexing with candidate lattices on union set failed')
+                  print ('Reindexing with candidate lattices on union set failed', str(e))
               # Get a sense of the variability in dh. Assign Z-score cutoff from there
               try:
                 Z_cutoff = self.params.iota.random_sub_sampling.Z_cutoff
@@ -490,6 +498,7 @@ class Processor_iota(Processor):
 
                   #self.refine(all_experiments_tmp, all_indexed_tmp)
                   #from IPython import embed; embed(); exit()
+                  #print ('DH = %12.7f and CUTOFF = %12.7f'%(dh, dh_cutoff))
                   if dh < dh_cutoff and refl['miller_index'] != (0,0,0):
                     indexed_spots_idx.append(ii)
                 # Make sure the number of spots indexed by a model is above a threshold
@@ -692,17 +701,18 @@ class Processor_iota(Processor):
     from scitbx.array_family import flex
     moved_detector = copy.deepcopy(detector)
     dnew = flex.double() # list to store all the dnew values
-    r0 = col(detector.get_ray_intersection(beam.get_s0())[1])  # beam center
     for ii in range(len(indexed)):
       panel_num = indexed[ii]['panel']
       panel = detector[panel_num]
+      r0 = col(panel.get_ray_intersection(beam.get_s0()))  # beam center
       D = panel.get_origin()[-1]
-      rcal = col(indexed[ii]['xyzcal.mm'][0:2]) - r0
-      robs = col(indexed[ii]['xyzobs.mm.value'][0:2]) - r0
+      rcal = col(indexed[ii]['xyzcal.mm'][0:2]) - r0 #- col(panel.get_origin()[0:2])
+      robs = col(indexed[ii]['xyzobs.mm.value'][0:2]) - r0 #- col(panel.get_origin()[0:2])
       dnew.append((robs.length()/rcal.length())*D)
+    #from IPython import embed; embed(); exit()
 
     new_distance = flex.mean(dnew)
-    print ('NEW_DET_DISTANCE ',new_distance, ' ',image_identifier[-28:])
+    print ('NEW_DET_DISTANCE ',new_distance)
     for panel in moved_detector:
       orix,oriy,oriz = panel.get_origin()
       new_origin = tuple((orix,oriy,new_distance))
