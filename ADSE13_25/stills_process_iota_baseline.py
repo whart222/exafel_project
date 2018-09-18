@@ -325,10 +325,10 @@ class Processor_iota(Processor):
               observed_samples_list.append(observed_sample)
             except Exception:
               print('Indexing failed for some reason')
-          from libtbx.easy_pickle import dump,load
-          dump('experiments_list.pickle', experiments_list)
-          dump('observed_samples_list.pickle', observed_samples_list)
-          from libtbx.easy_pickle import load
+          #from libtbx.easy_pickle import dump,load
+          #dump('experiments_list.pickle', experiments_list)
+          #dump('observed_samples_list.pickle', observed_samples_list)
+          #from libtbx.easy_pickle import load
           #exit()
           #experiments_list = load('experiments_list.pickle')
           #observed_samples_list = load('observed_samples_list.pickle')
@@ -470,6 +470,8 @@ class Processor_iota(Processor):
                     centroid_list_idx = list(indexed_centroid['xyzobs.mm.value']).index(indexed_tmp['xyzobs.mm.value'][idx])
                     x = indexed_centroid['miller_index'][centroid_list_idx]
                     y = indexed_tmp['fractional_miller_index'][idx]
+                    if indexed_centroid['miller_index'][centroid_list_idx] != indexed_tmp['miller_index'][idx]:
+                      continue
                     if indexed_centroid['miller_index'][centroid_list_idx] not in hkl_all_values:
                       hkl_all_values[indexed_centroid['miller_index'][centroid_list_idx]] = flex.vec3_double()
                     hkl_all_values[indexed_centroid['miller_index'][centroid_list_idx]].append(y)
@@ -516,7 +518,7 @@ class Processor_iota(Processor):
                     experiments.append(expt)
 
               except Exception:
-                print ('dh_list calculation and outlier rejection failed')
+                print ('dh_list calculation and outlier rejection failed',str(e))
 
             # Make sure crytal model numbers are in sequence, example 0,1,2 instead of 0,2,3
             # when model 1 was not used for consensus part. Otherwise refine won't work
