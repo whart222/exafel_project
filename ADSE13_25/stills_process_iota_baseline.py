@@ -356,6 +356,7 @@ class Processor_iota(Processor):
             sample = {}
             all_experimental_models = {}
             assert len(experiments_list[0].detectors()) == 1, 'IOTA currently supports only one detector when indexing'
+            import copy
             original_detector = copy.deepcopy(experiments_list[0].detectors()[0])
             for idx,crystal_model in enumerate(clustered_experiments_list):
               if crystal_model >= 0:
