@@ -355,6 +355,8 @@ class Processor_iota(Processor):
             experiments = ExperimentList()
             sample = {}
             all_experimental_models = {}
+            assert len(experiments_list[0].detectors()) == 1, 'IOTA currently supports only one detector when indexing'
+            original_detector = copy.deepcopy(experiments_list[0].detectors()[0])
             for idx,crystal_model in enumerate(clustered_experiments_list):
               if crystal_model >= 0:
                 if crystal_model not in sample:
@@ -400,7 +402,6 @@ class Processor_iota(Processor):
                 # Only done in radial direction
                 assert len(experiments_centroid.detectors()) == 1, 'aligning spots only work with one detector'
                 import copy
-                original_detector = copy.deepcopy(experiments_centroid.detectors()[0])
                 image_identifier = imagesets[0].get_image_identifier(0)
                 moved_detector = self.move_detector_to_bring_calc_spots_onto_obs(experiments_centroid.detectors()[0], experiments_centroid.beams()[0], indexed_centroid, image_identifier)
                 # Reindex everything again with new detector distance!
@@ -489,6 +490,9 @@ class Processor_iota(Processor):
                                 refl['miller_index'][1]-refl['fractional_miller_index'][1],
                                 refl['miller_index'][2]-refl['fractional_miller_index'][2]]).norm()
                   hfrac,kfrac,lfrac = hkl_all_values[refl['miller_index']].parts()
+                  # FIXME arbitrary cutoff: if not enough datapoints, cant do a statistical analysis
+                  if len(list(hfrac)) < 3:
+                    continue
                   dh_cutoff = hfrac.sample_standard_deviation()*hfrac.sample_standard_deviation()+ \
                               kfrac.sample_standard_deviation()*kfrac.sample_standard_deviation()+ \
                               lfrac.sample_standard_deviation()*lfrac.sample_standard_deviation()
@@ -517,7 +521,7 @@ class Processor_iota(Processor):
                       expt.detector = original_detector
                     experiments.append(expt)
 
-              except Exception:
+              except Exception as e:
                 print ('dh_list calculation and outlier rejection failed',str(e))
 
             # Make sure crytal model numbers are in sequence, example 0,1,2 instead of 0,2,3
