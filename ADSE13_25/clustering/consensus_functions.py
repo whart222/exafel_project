@@ -79,13 +79,13 @@ class clustering_manager(group_args):
     n_cluster = 0
 #
 #
+    print ('Z_DELTA = ',self.Z_delta)
     for ic in range(NN):
       # test the density & rho
       item_idx = delta_order[ic]
       delta_stats = flex.mean_and_variance(delta)
-      Z_delta = 2.0
       if ic != 0:
-        if (delta[item_idx]-delta_stats.mean())/delta_stats.unweighted_sample_standard_deviation() < Z_delta:
+        if (delta[item_idx]-delta_stats.mean())/delta_stats.unweighted_sample_standard_deviation() < self.Z_delta:
         #if delta[item_idx] <= 0.25*delta[delta_order[0]]: # too low to be a medoid
           continue
       try:
@@ -194,7 +194,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   Dij = NCDist_flatten(MM_double)
   from scitbx.math import five_number_summary
   d_c = clustering_params.d_c #five_number_summary(list(Dij))[1]
-  CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=clustering_params.max_percentile_rho_uc)
+  CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=clustering_params.max_percentile_rho_uc,Z_delta=clustering_params.Z_delta)
   n_cluster = 1+flex.max(CM.cluster_id_final)
   print (len(cells), ' datapoints have been analyzed')
   print ('%d CLUSTERS'%n_cluster)
