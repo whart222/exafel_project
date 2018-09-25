@@ -1,0 +1,68 @@
+input {
+  address = "MfxEndstation.0:Rayonix.0"
+}
+format {
+  cbf {
+    detz_offset = 140.2
+    invalid_pixel_mask = "/global/cscratch1/sd/asmit/LS49/iota/masks/mask.pickle"
+    mode = cspad *rayonix
+    rayonix {
+      bin_size = 4
+      override_beam_x = -101
+      override_beam_y = 375
+    }
+  }
+}
+output {
+  datablock_filename = None
+  strong_filename = None
+}
+spotfinder {
+  filter {
+    min_spot_size = 2
+    d_min = 2
+  }
+  threshold {
+    dispersion {
+      gain = 0.46
+      global_threshold = 100
+    }
+  }
+}
+indexing {
+  known_symmetry {
+    space_group = P 1 21 1
+    unit_cell = 63.6,28.8,35.6,90,106.5,90
+  }
+  refinement_protocol {
+    d_min_start = 2
+  }
+  method = fft1d
+#  multiple_lattice_search {
+#    max_lattices = 10
+#  }
+}
+
+iota {
+  random_sub_sampling {
+    fraction_sub_sample=0.80
+    ntrials = 50
+    no_outlier_rejection_and_candidates_refinement=True
+    finalize_method=union_and_reindex
+    Z_cutoff=2.0
+    show_plot=False
+  }
+  clustering {
+    Z_delta = 2.0
+  }
+}
+indexing.basis_vector_combinations.max_refine=1
+
+radial_average {
+  enable = True
+  two_theta_low = 25.5
+  two_theta_high = 29.5
+  verbose = False
+  output_bins = False
+  show_plots = False
+}
