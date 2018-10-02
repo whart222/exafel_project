@@ -1,3 +1,13 @@
+# *NOTE*
+# - The ENV _proxy lines are specific for building this docker image at SLAC.
+# - For lcls2 and cctbx repos, you can use git clone: e.g.
+#   -- replace ADD lcls2 lcls2 with RUN git clone https://github.com/slac-lcls/lcls2.git
+#   -- replace all the cctbx build lines with
+#      RUN mkdir cctbx &&\
+#          cd cctbx &&\
+#          wget https://raw.githubusercontent.com/cctbx/cctbx_project/master/libtbx/auto_build/bootstrap.py &&\
+#          python bootstrap.py hot update build --builder=dials --with-python=/opt/conda/bin/python --nproc=8 &&\ 
+#          cd ..
 FROM centos:centos7
 
 RUN yum clean all && \
@@ -18,30 +28,50 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda2-latest-Linux-x86
     conda update -y conda && \
     conda update -y --all && \
     conda install numpy cython cmake git && \
-    conda install mpi4py future h5py mpich2 wxpython pillow \
-                  libtiff mock pytest jinja2 scikit-learn tabulate &&\
-    conda install --channel conda-forge orderedset &&\
+    conda install --channel conda-forge "mpich>=3" mpi4py h5py libtiff orderedset &&\
+    conda install future wxpython pillow \
+                  mock pytest jinja2 scikit-learn tabulate &&\
+    conda install rapidjson &&\
     python -m pip install procrunner &&\
+    conda install --channel conda-forge versioneer &&\
+    conda install mongodb pymongo requests &&\
     conda clean -y --all
 
 SHELL ["/bin/bash", "-c"]
 ENV BASH_ENV ~/.bashrc
 
-# build psana2 with python 2
-RUN git clone https://github.com/slac-lcls/lcls2.git && \
-    cd lcls2 && \
-    ./build_python2_psana.sh
-
-RUN mkdir -p /reg/g &&\
-    mkdir -p /reg/d/psdm/CXI &&\
-    mkdir -p /reg/d/psdm/cxi &&\
-    mkdir -p /reg/d/psdm/mfx &&\
-    mkdir -p /reg/d/psdm/MFX
-
-# cctbx
-RUN mkdir cctbx &&\
-    cd cctbx &&\
-    wget https://raw.githubusercontent.com/monarin/cctbx_project/master/libtbx/auto_build/bootstrap.py &&\
-    python bootstrap.py hot update build --builder=dials --with-python=/opt/conda/bin/python --nproc=1 &&\
-    conda uninstall --force mpich2 &&\
+# build psana2 without psdaq
+ENV PYTHONPATH=/lcls2/install/lib/python2.7/site-packages
+ENV PATH=/lcls2/install/bin:/lcls2/build/bin${PATH}
+RUN git clone https://github.com/slac-lcls/lcls2.git
+RUN cd lcls2 && \
+    ./build_all.sh -d && \
     cd ..
+
+# build cctbx
+RUN mkdir cctbx &&\
+	cd cctbx &&\
+	wget https://raw.githubusercontent.com/cctbx/cctbx_project/master/libtbx/auto_build/bootstrap.py &&\
+	python bootstrap.py hot update build --builder=dials --with-python=/opt/conda/bin/python --nproc=4 &&\
+ 	cd ..
+
+RUN conda uninstall --force mpich 
+RUN yum -y install strace
+
+# setup environments for psana2 and cctbx
+ENV CONDA_EXE=/opt/conda/bin/conda
+ENV CONDA_PREFIX=/opt/conda
+ENV CONDA_PROMPT_MODIFIER=(base)
+ENV CONDA_PYTHON_EXE=/opt/conda/bin/python
+ENV CONDA_SHLVL=1
+ENV INFOPATH=/opt/rh/devtoolset-7/root/usr/share/info
+
+ENV LD_LIBRARY_PATH=/opt/udiImage/modules/mpich/lib64:/opt/rh/devtoolset-7/root/usr/lib64:/opt/rh/devtoolset-7/root/usr/lib:/opt/rh/devtoolset-7/root/usr/lib64/dyninst:/opt/rh/devtoolset-7/root/usr/lib/dyninst:/opt/rh/devtoolset-7/root/usr/lib64:/opt/rh/devtoolset-7/root/usr/lib
+ENV MANPATH=/opt/rh/devtoolset-7/root/usr/share/man:/usr/common/software/man:/usr/common/mss/man:/usr/common/nsg/man:/opt/cray/pe/mpt/7.7.0/gni/man/mpich:/opt/cray/pe/atp/2.1.1/man:/opt/cray/alps/6.5.28-6.0.5.0_18.6__g13a91b6.ari/man:/opt/cray/job/2.2.2-6.0.5.0_8.47__g3c644b5.ari/man:/opt/cray/pe/pmi/5.0.13/man:/opt/cray/pe/libsci/18.03.1/man:/opt/cray/pe/man/csmlversion:/opt/cray/pe/craype/2.5.14/man:/opt/intel/compilers_and_libraries_2018.1.163/linux/man/common:/usr/syscom/nsg/man:/opt/cray/pe/modules/3.2.10.6/share/man:/global/homes/c/canon/man:/usr/local/man:/usr/share/man:/opt/cray/share/man:/opt/cray/pe/man:/opt/cray/share/man
+ENV PATH=/cctbx/build/bin:/lcls2/install/bin:/lcls2/build/bin:/opt/rh/devtoolset-7/root/usr/bin:/opt/conda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/udiImage/bin
+ENV PCP_DIR=/opt/rh/devtoolset-7/root
+ENV PERL5LIB=/opt/rh/devtoolset-7/root//usr/lib64/perl5/vendor_perl:/opt/rh/devtoolset-7/root/usr/lib/perl5:/opt/rh/devtoolset-7/root//usr/share/perl5/vendor_perl
+ENV PMI_MMAP_SYNC_WAIT_TIME=600
+ENV PYTHONPATH=/lcls2/install/lib/python2.7/site-packages
+ENV HOME=/tmp
+
