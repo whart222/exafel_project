@@ -27,6 +27,10 @@ clustering {
   max_percentile_rho_ori = 0.85
     .type = float
     .help = rho of a data point needs to be above this value to be considered a mediod during orientational clustering
+  min_datapts = 5
+    .type = int
+    .help = Minimum number of datapoints in each cluster to be able to be considered \
+            for further indexing
 }
 
 '''
@@ -133,6 +137,8 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   Clustering is first done first based on unit cell dimensions. Then for each of the clusters identified,
   a further clustering is done based on orientational matrix A
   '''
+  if return_only_first_indexed_model:
+    return [experiments_list[0].crystals()[0]], None
   cells = []
 
   from xfel.clustering.singleframe import CellOnlyFrame
@@ -265,7 +271,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       CM_mapping[CM.cluster_id_full[i]].append((i,len(uc_experiments_list[CM.cluster_id_full[i]])-1))
     for cluster in uc_cluster_count:
       # Make sure there are atleast a minimum number of samples in the cluster
-      if uc_cluster_count[cluster] < 5:
+      if uc_cluster_count[cluster] < clustering_params.min_datapts:
         continue
       Dij_ori[cluster] = flex.double([[0.0]*uc_cluster_count[cluster]]*uc_cluster_count[cluster])
     # Now populate the Dij_ori array
@@ -289,6 +295,8 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=clustering_params.max_percentile_rho_ori, Z_delta=clustering_params.Z_delta)
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       for i in range(n_cluster_ori):
+        if len([zz for zz in CM.cluster_id_final if zz == i]) < clustering_params.min_datapts:
+          continue
         item = flex.first_index(CM_ori.cluster_id_maxima, i)
         dxtbx_crystal_model = uc_experiments_list[cluster][item].crystals()[0]
         dxtbx_crystal_models.append(dxtbx_crystal_model)
@@ -320,10 +328,10 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         plt.show()
   #from IPython import embed; embed()
   # FIXME Still to be worked out what exactly should be returned
-  if return_only_first_indexed_model:
-    return [experiments_list[0].crystals()[0]], clustered_experiments_list
+  #if return_only_first_indexed_model:
+  #  return [experiments_list[0].crystals()[0]], clustered_experiments_list
   if len(dxtbx_crystal_models) > 0:
     return dxtbx_crystal_models, clustered_experiments_list
   else:
     # If nothing works, atleast return the 1st crystal model that was found
-    return [experiments_list[0].crystals()[0]], clustered_experiments_list
+    return [experiments_list[0].crystals()[0]], None

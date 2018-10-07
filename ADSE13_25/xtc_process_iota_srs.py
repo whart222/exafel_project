@@ -1213,6 +1213,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
         len_max_indexed = -999
         experiments_list = []
         #No outlier rejection or refinement should be done for the candidate basis vectors
+        self.known_crystal_models = None
         outlier_rejection_flag=self.params.indexing.stills.candidate_outlier_rejection
         refine_all_candidates_flag=self.params.indexing.stills.refine_all_candidates
         if self.params.iota.random_sub_sampling.no_outlier_rejection_and_candidates_refinement:
@@ -1225,13 +1226,14 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
             print('IOTA:SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']),' ', trial)
             experiments_tmp, indexed_tmp = self.index(datablock, observed_sample)
             experiments_list.append(experiments_tmp)
-          except:
+          except Exception as e:
             print('Indexing failed for some reason')
         if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
           from exafel_project.ADSE13_25.clustering.old_consensus_functions import get_uc_consensus as get_consensus
           #known_crystal_models = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model = False)
-          known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=False, return_only_first_indexed_model=False, finalize_method=None, clustering_params=None)
-          self.known_crystal_models = known_crystal_models
+          if len(experiments_list) > 0:
+            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=False, return_only_first_indexed_model=False, finalize_method=None, clustering_params=None)
+            self.known_crystal_models = known_crystal_models
           print ('IOTA: Reindexing with best chosen crystal model')
           # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
           self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag

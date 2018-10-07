@@ -1239,6 +1239,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
           # Add an id for each strong spot observed in the image
           observed['spot_id'] = flex.size_t(range(len(observed)))
           # No outlier rejection or refinement should be done for the candidate basis vectors
+          self.known_crystal_models=None
           outlier_rejection_flag=self.params.indexing.stills.candidate_outlier_rejection
           refine_all_candidates_flag=self.params.indexing.stills.refine_all_candidates
           if self.params.iota.random_sub_sampling.no_outlier_rejection_and_candidates_refinement:
@@ -1270,12 +1271,17 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
             from exafel_project.ADSE13_25.clustering.consensus_functions import get_uc_consensus as get_consensus
-            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering)
+            if len(experiments_list) > 0:
+              known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering)
+            else:
+              known_crystal_models=None
+              cluster_experiments_list=None
           print ('IOTA: Finalizing consensus')
           #from IPython import embed; embed(); exit()
           if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
             print ('IOTA: Chosen finalize method is reindex_with_known_crystal_models')
-            self.known_crystal_models = known_crystal_models
+            if known_crystal_models is not None:
+              self.known_crystal_models = known_crystal_models
             # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
             self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
             self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag

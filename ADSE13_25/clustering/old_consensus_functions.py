@@ -12,7 +12,7 @@ import os
 def get_dij_ori(cryst1, cryst2, is_reciprocal=True):
   '''
   Takes in 2 dxtbx crystal models, returns the distance between the 2 models in crystal
-  space. Currently the distance is defined as the Z-score difference as implemented in 
+  space. Currently the distance is defined as the Z-score difference as implemented in
   cctbx/uctbx
   Info regarding some params in best_similarity_transformation after discussion with NKS
   fractional_length_tolerance :: could have value 1 or 200 ??
@@ -26,11 +26,11 @@ def get_dij_ori(cryst1, cryst2, is_reciprocal=True):
   try:
     best_similarity_transform = cryst2_ori.best_similarity_transformation(
         other = cryst1_ori, fractional_length_tolerance = 1.00,
-        unimodular_generator_range=1) 
+        unimodular_generator_range=1)
     cryst2_ori_best=cryst2_ori.change_basis(best_similarity_transform)
-  except:
+  except Exception as e:
     cryst2_ori_best = cryst2_ori
-  print 'difference z-score = ', cryst1_ori.difference_Z_score(cryst2_ori_best)
+  #print 'difference z-score = ', cryst1_ori.difference_Z_score(cryst2_ori_best)
   return cryst1_ori.difference_Z_score(cryst2_ori_best)
 
 
@@ -59,10 +59,10 @@ class clustering_manager(group_args):
 #
     for ic in range(NN):
       # test the density & rho
-      item_idx = delta_order[ic] 
+      item_idx = delta_order[ic]
       if ic != 0:
         if delta[item_idx] <= 0.25*delta[delta_order[0]]: # too low to be a medoid
-          continue 
+          continue
       #from IPython import embed; embed()
       item_rho_order = rho_order_list.index(item_idx)
       if (item_rho_order)/NN < MAX_PERCENTILE_RHO:
@@ -79,10 +79,10 @@ class clustering_manager(group_args):
     #import pdb; pdb.set_trace()
     R.cluster_assignment(rho_order, cluster_id)
     self.cluster_id_full = cluster_id.deep_copy()
-    
+
     #halo = flex.bool(NN,False)
     #border = R.get_border( cluster_id = cluster_id )
-  
+
     #for ic in range(n_cluster): #loop thru all border regions; find highest density
     #  this_border = (cluster_id == ic) & (border==True)
     #  if this_border.count(True)>0:
@@ -100,14 +100,16 @@ class clustering_manager(group_args):
 def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexed_model=False,finalize_method=None, clustering_params=None):
   '''
   Uses the Rodriguez Laio 2014 method to do a clustering of the unit cells and then vote for the highest
-  consensus unit cell. Input needs to be a list of experiments object. 
+  consensus unit cell. Input needs to be a list of experiments object.
   Clustering code taken from github.com/cctbx-xfel/cluster_regression
   Returns an experiment object with crystal unit cell from the cluster with the most points
   '''
+  if return_only_first_indexed_model:
+    return [experiments_list[0].crystals()[0]], None
   cells = []
   from xfel.clustering.singleframe import CellOnlyFrame
   save_plot = False
-  # Flag for testing Lysozyme data from NKS.Make sure cluster_regression repository is present and configured 
+  # Flag for testing Lysozyme data from NKS.Make sure cluster_regression repository is present and configured
   # Program will exit after plots are displayed if this flag is true
   test_nks = False
   if test_nks:
@@ -156,7 +158,7 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
   print ('Now constructing a Dij matrix: Starting Unit Cell clustering')
   NN = len(MM)
   from cctbx.uctbx.determine_unit_cell import NCDist_flatten
-  Dij = NCDist_flatten(MM_double) 
+  Dij = NCDist_flatten(MM_double)
   #from IPython import embed; embed(); exit()
   from scitbx.math import five_number_summary
   d_c = 6.13 #five_number_summary(list(Dij))[1]
@@ -197,8 +199,8 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
 
   # Now look at each unit cell cluster for orientational clustering
   # idea is to cluster the orientational component in each of the unit cell clusters
-  #  
-  do_orientational_clustering = not return_only_first_indexed_model # temporary. 
+  #
+  do_orientational_clustering = not return_only_first_indexed_model # temporary.
   dxtbx_crystal_models = []
   #from IPython import embed; embed(); exit()
   if do_orientational_clustering:
@@ -216,7 +218,7 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
       #crystal_orientation_list = []
       #for i in range(len(experiments_list)):
       #  crystal_orientation_list.append(crystal_orientation(experiments_list[i].crystals()[0].get_A(), True))
-        #from IPython import embed; embed(); exit() 
+        #from IPython import embed; embed(); exit()
         #A_direct = sqr(crystal_orientation_list[i].reciprocal_matrix()).transpose().inverse()
         #print ("Direct A matrix 1st element = %12.6f"%A_direct[0])
     for i in range(len(experiments_list)):
@@ -225,7 +227,7 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
       uc_experiments_list[CM.cluster_id_full[i]].append(experiments_list[i])
     for cluster in uc_cluster_count:
       # Make sure there are atleast a minimum number of samples in the cluster
-      if uc_cluster_count[cluster] < 5:  
+      if uc_cluster_count[cluster] < 5:
         continue
       Dij_ori[cluster] = flex.double([[0.0]*uc_cluster_count[cluster]]*uc_cluster_count[cluster])
     # Now populate the Dij_ori array
@@ -237,15 +239,17 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
           Dij_ori[cluster][N_samples_in_cluster*i+j] = dij_ori
           Dij_ori[cluster][N_samples_in_cluster*j+i] = dij_ori
 
-    # Now do the orientational cluster analysis 
+    # Now do the orientational cluster analysis
     d_c_ori = 0.13
-    from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding 
+    from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding
     #plot_with_dimensional_embedding(1-Dij_ori[1]/flex.max(Dij_ori[1]), show_plot=True)
     for cluster in Dij_ori:
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85)
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       #from IPython import embed; embed()
       for i in range(n_cluster_ori):
+        if len([zz for zz in CM.cluster_id_final if zz == i]) < 5:
+          continue
         item = flex.first_index(CM_ori.cluster_id_maxima, i)
         dxtbx_crystal_model = uc_experiments_list[cluster][item].crystals()[0]
         dxtbx_crystal_models.append(dxtbx_crystal_model)
@@ -267,12 +271,11 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
         plt.ylim([-10,stretch_plot_factor*flex.max(CM_ori.delta)])
         plt.show()
   #from IPython import embed; embed(); exit()
-  # FIXME Still to be worked out what exactly should be returned 
-  if return_only_first_indexed_model:
-    return [experiments_list[0].crystals()[0]], None
+  # FIXME Still to be worked out what exactly should be returned
+  #if return_only_first_indexed_model:
+  #  return [experiments_list[0].crystals()[0]], None
   if len(dxtbx_crystal_models) > 0:
     return dxtbx_crystal_models, None
   else:
     # If nothing works, atleast return the 1st crystal model that was found
     return [experiments_list[0].crystals()[0]], None
-   
