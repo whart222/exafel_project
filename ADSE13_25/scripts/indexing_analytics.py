@@ -3,6 +3,7 @@ import sys, os, math
 from iotbx.detectors.cspad_detector_formats import reverse_timestamp
 from matplotlib import pyplot as plt
 from dials.array_family import flex
+from libtbx.utils import Sorry
 
 message = '''
 Code for calculating analytics for indexing
@@ -48,6 +49,10 @@ phil_scope = parse('''
   show_plot = False
    .type = bool
    .help = Flag to determine if unit_cell plots should be shown
+  indexing_time_cutoff = None
+    .type = float
+    .help = Maximum time that indexing of a certain image should take (in seconds). If this is set, \
+            one can get the list of timestamps that exceed this cutoff
 
 ''')
 
@@ -112,15 +117,24 @@ def run(params):
     results = [get_hits_and_indexing_stats(iterable, debug_root)]
     results2 = [get_uc_and_rmsd_stats(iterable2, root)]
   # Now evaulate summary statistics
+  print ('Now evaluating summary statistics')
   n_hits = 0
   n_idx = 0
   t_idx = 0
   t_idx_success = 0
+  all_idx_cutoff_time_exceeded_event = []
   for ii,r in enumerate(results):
     n_hits += r[0]
     n_idx += r[1]
     t_idx += r[2]
     t_idx_success += r[3]
+    all_idx_cutoff_time_exceeded_event.extend(r[4])
+  # Write out the cutoff time exceeded events in a format that xtc_process.py can interpret for skipping events
+  if indexing_time_cutoff is not None:
+    fts = open('timestamps_to_skip.dat','w')
+    for evt in all_idx_cutoff_time_exceeded_event:
+      fts.write('psanagpu999,%s,%s,fail\n'%(evt,evt))
+    fts.close()
   if out_logfile is not None:
     total_time = []
     run_number = int(root.strip().split('/')[-3][1:])
@@ -237,6 +251,7 @@ def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
 #print indexing_time.keys()
 #print len(hits)
   total_idx_time=0
+  idx_cutoff_time_exceeded_event = []
   for event in indexing_time.keys():
 #  print event, indexing_time[event]
     total_idx_time +=indexing_time[event]
@@ -271,6 +286,8 @@ def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
       t_idx=0.0
       t_idx2 = indexing_time_all[event]
       idx_attempt_time.append(t_idx2)
+      if t_idx2 > indexing_time_cutoff:
+        idx_cutoff_time_exceeded_event.append(event)
     else:
       is_idx=0
       t_idx=0.0
@@ -280,7 +297,7 @@ def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
 
   if write_out_timings:
     fout.close()
-  return (len(hits), len(idx_successful_time), sum(idx_attempt_time)/3600.0, sum(idx_successful_time)/3600.0)
+  return (len(hits), len(idx_successful_time), sum(idx_attempt_time)/3600.0, sum(idx_successful_time)/3600.0, idx_cutoff_time_exceeded_event)
 
 # Extract timing information from log file
 def get_uc_and_rmsd_stats(filenames, root, rank=0):
@@ -317,7 +334,8 @@ def get_uc_and_rmsd_stats(filenames, root, rank=0):
   return all_uc_a, all_uc_b, all_uc_c, all_uc_alpha, all_uc_beta, all_uc_gamma, dR
 
 if __name__ == '__main__':
-  print (message)
+  if '--help' in sys.argv[1:] or '--h' in sys.argv[1:]:
+    print (message)
   params = params_from_phil(sys.argv[1:])
   num_nodes = params.num_nodes #int(sys.argv[2])
   root = os.path.join(params.input_path, 'out')
@@ -328,5 +346,5 @@ if __name__ == '__main__':
   write_out_timings=params.write_out_timings
   string_to_search_for = params.string_to_search_for
   show_plot = params.show_plot
-  print (params.mpi, 'WHTSTST')
+  indexing_time_cutoff = params.indexing_time_cutoff
   run(params)
