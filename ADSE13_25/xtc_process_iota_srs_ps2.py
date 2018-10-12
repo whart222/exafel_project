@@ -1,4 +1,5 @@
 from __future__ import division
+from six.moves import range
 # -*- Mode: Python; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 8 -*-
 #
 # LIBTBX_SET_DISPATCHER_NAME cctbx.xfel.xtc_process
@@ -402,59 +403,36 @@ def run_psana2(ims, params, comm):
     ims: InMemScript (cctbx driver class)
     params: input parameters
     comm: mpi comm for broadcasting per run calibration files"""
-    import time
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-    
     ds = psana.DataSource("exp=%s:run=%s:dir=%s" \
         %(params.input.experiment, params.input.run_num, params.input.xtc_dir), \
-        filter=filter, max_events=params.dispatch.max_events, batch_size=1)
-    
-    det = None
-    if ds.nodetype == "bd":
-      det = ds.Detector(params.input.address)
-   
-    cn_evt = 0 
+        filter=filter, max_events=params.dispatch.max_events, det_name=params.input.address)
+
     for run in ds.runs():
+      det = ds.Detector(ds.det_name)
       # broadcast cctbx per run calibration
       if comm.Get_rank() == 0:
         PS_CALIB_DIR = os.environ.get('PS_CALIB_DIR')
         assert PS_CALIB_DIR
-        metro = easy_pickle.load(os.path.join(PS_CALIB_DIR,'metro.pickle'))
         dials_mask = easy_pickle.load(params.format.cbf.invalid_pixel_mask)
       else:
-        metro = None
         dials_mask = None
-      metro = comm.bcast(metro, root=0)
       dials_mask = comm.bcast(dials_mask, root=0)
-      t_evt_0 = time.time()
+
       for evt in run.events():
-        if det:
-          t_evt_start = time.time()
-          
-	  ims.base_dxtbx = cspad_cbf_tbx.env_dxtbx_from_slac_metrology(run, params.input.address, metro=metro)
-          ims.dials_mask = dials_mask
-          ims.spotfinder_mask = None
-          ims.integration_mask = None
-          
-          ims.process_event(run, evt, det)
-          t_evt_proc_done = time.time()
+        ims.base_dxtbx = cspad_cbf_tbx.env_dxtbx_from_slac_metrology(run, params.input.address)
+        ims.dials_mask = dials_mask
+        ims.spotfinder_mask = None
+        ims.integration_mask = None
+        ims.psana_det = det
+        if params.format.file_format == 'cbf':
+          if params.format.cbf.cspad.common_mode.algorithm == "custom":
+            ims.common_mode = params.format.cbf.cspad.common_mode.custom_parameterization
+            assert ims.common_mode is not None
+          else:
+            ims.common_mode = params.format.cbf.cspad.common_mode.algorithm # could be None or default
+        ims.process_event(run, evt)
 
-          ims.finalize()
-          t_evt_end = time.time()
-          print("PROFILE_EVT R %f PROC %f FIN %f ALL %f"%(t_evt_start-t_evt_0, t_evt_proc_done-t_evt_start, t_evt_end-t_evt_proc_done, t_evt_end-t_evt_start))
-          cn_evt += 1
-          t_evt_0 = time.time()
-    
-    sendbuf = np.zeros(1, dtype='i') + cn_evt
-    recvbuf = None
-    if rank == 0:
-      recvbuf = np.empty([size, 1], dtype='i')
-    comm.Gather(sendbuf, recvbuf, root=0)
-    if rank == 0:
-      open(os.path.join(os.environ.get('SCRATCH'), "logs_%s.txt"%os.getpid()), "wb").write('%d'%np.sum(recvbuf))
-
- 
+    ims.finalize()
 
 class EventOffsetSerializer(object):
   """ Pickles python object """
@@ -532,7 +510,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       psana_mask = flex.bool(psana_mask == 1)
     assert psana_mask.focus() == (32, 185, 388)
     dials_mask = []
-    for i in xrange(32):
+    for i in range(32):
       dials_mask.append(psana_mask[i:i+1,:,:194])
       dials_mask[-1].reshape(flex.grid(185,194))
       dials_mask.append(psana_mask[i:i+1,:,194:])
@@ -545,12 +523,12 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     try:
       params, options = self.parser.parse_args(
         show_diff_phil=True, quick_parse=True)
-    except Exception, e:
+    except Exception as e:
       if "Unknown command line parameter definition" in str(e) or \
           "The following definitions were not recognised" in str(e):
         deprecated_params = ['mask_nonbonded_pixels','gain_mask_value','algorithm','custom_parameterization']
         deprecated_strs = ['%s','%s','common_mode.%s','common_mode.%s']
-        for i in xrange(len(deprecated_params)):
+        for i in range(len(deprecated_params)):
           if deprecated_params[i] in str(e):
             print "format.cbf.%s"%(deprecated_strs[i]%deprecated_params[i]), "has changed to format.cbf.cspad.%s"%(deprecated_strs[i]%deprecated_params[i])
       raise
@@ -671,7 +649,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     if not os.path.exists(debug_dir):
       try:
         os.makedirs(debug_dir)
-      except OSError, e:
+      except OSError as e:
         pass # due to multiprocessing, makedirs can sometimes fail
     assert os.path.exists(debug_dir)
 
@@ -756,7 +734,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
           # load a header only cspad cbf from the slac metrology
           try:
             self.base_dxtbx = cspad_cbf_tbx.env_dxtbx_from_slac_metrology(run, params.input.address)
-          except Exception, e:
+          except Exception as e:
             raise Sorry("Couldn't load calibration file for run %d, %s"%(run.run(), str(e)))
         elif params.format.cbf.mode == "rayonix":
           # load a header only rayonix cbf from the input parameters
@@ -779,7 +757,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
             if self.params.format.cbf.cspad.mask_nonbonded_pixels:
               psana_mask = self.psana_det.mask(run.run(),calib=False,status=False,edges=False,central=False,unbond=True,unbondnbrs=True)
               dials_mask = self.psana_mask_to_dials_mask(psana_mask)
-              self.dials_mask = [self.dials_mask[i] & dials_mask[i] for i in xrange(len(dials_mask))]
+              self.dials_mask = [self.dials_mask[i] & dials_mask[i] for i in range(len(dials_mask))]
         else:
           if params.format.cbf.mode == "cspad":
             psana_mask = self.psana_det.mask(run.run(),calib=True,status=True,edges=True,central=True,unbond=True,unbondnbrs=True)
@@ -847,12 +825,14 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
               print "Rank %d beginning processing"%rank
               try:
                 self.process_event(run, evt)
-              except Exception, e:
+              except Exception as e:
                 print "Rank %d unhandled exception processing event"%rank, str(e)
               print "Rank %d event processed"%rank
-        except Exception, e:
+        except Exception as e:
           print "Error caught in main loop"
           print str(e)
+        print "Synchronizing rank %d"%rank
+        comm.Barrier()
         print "Rank %d done with main loop"%rank
       else:
         import resource
@@ -888,14 +868,14 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     print "Rank %d finalizing"%rank
     try:
       self.finalize()
-    except Exception, e:
+    except Exception as e:
       print "Rank %d, exception caught in finalize"%rank
       print str(e)
 
     if params.format.file_format == "cbf" and params.output.tmp_output_dir == "(NONE)":
       try:
         os.rmdir(tmp_dir)
-      except Exception, e:
+      except Exception as e:
         pass
 
     if params.joint_reintegration.enable:
@@ -971,7 +951,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
             self.integrate(expts, refls)
             dump = ExperimentListDumper(expts)
             dump.as_json(os.path.join(reint_dir, base_name + "_refined_experiments.json"))
-          except Exception, e:
+          except Exception as e:
             print "Couldn't reintegrate", img_file, str(e)
     print "Rank %d signing off"%rank
 
@@ -979,7 +959,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     # Used by database logger
     return self.run.run(), self.timestamp
 
-  def process_event(self, run, evt, det=None):
+  def process_event(self, run, evt):
     """
     Process a single event from a run
     @param run psana run object
@@ -1033,18 +1013,11 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     if self.params.format.file_format == 'cbf':
       if self.params.format.cbf.mode == "cspad":
         # get numpy array, 32x185x388
-        if PSANA2_VERSION:
-          # FIXME MONA: remove this when all detector interfaces are ready
-          data = det.raw(evt) - det.pedestals(run)
-          gain_mask = det.gain_mask(run)
-          if gain_mask is not None:
-            data *= gain_mask
-        else:
-          data = cspad_cbf_tbx.get_psana_corrected_data(self.psana_det, evt, use_default=False, dark=True,
-                                                      common_mode=self.common_mode,
-                                                      apply_gain_mask=self.params.format.cbf.cspad.gain_mask_value is not None,
-                                                      gain_mask_value=self.params.format.cbf.cspad.gain_mask_value,
-                                                      per_pixel_gain=self.params.format.cbf.cspad.per_pixel_gain)
+        data = cspad_cbf_tbx.get_psana_corrected_data(self.psana_det, evt, use_default=False, dark=True,
+                                                    common_mode=self.common_mode,
+                                                    apply_gain_mask=self.params.format.cbf.cspad.gain_mask_value is not None,
+                                                    gain_mask_value=self.params.format.cbf.cspad.gain_mask_value,
+                                                    per_pixel_gain=self.params.format.cbf.cspad.per_pixel_gain)
 
       elif self.params.format.cbf.mode == "rayonix":
         data = rayonix_tbx.get_data_from_psana_event(evt, self.params.input.address)
@@ -1066,7 +1039,10 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
         distance = self.params.format.cbf.override_distance
 
       if self.params.format.cbf.override_energy is None:
-        wavelength = cspad_tbx.evt_wavelength(evt)
+        if PSANA2_VERSION:
+          wavelength = 12398.4187/self.psana_det.photonEnergy(evt)
+        else:
+          wavelength = cspad_tbx.evt_wavelength(evt)
         if wavelength is None:
           print "No wavelength, skipping shot"
           self.debug_write("no_wavelength", "skip")
@@ -1143,7 +1119,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
     try:
       self.pre_process(datablock)
-    except Exception, e:
+    except Exception as e:
       self.debug_write("preprocess_exception", "fail")
       return
 
@@ -1189,7 +1165,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     self.debug_write("spotfind_start")
     try:
       observed = self.find_spots(datablock)
-    except Exception, e:
+    except Exception as e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("spotfinding_exception", "fail")
@@ -1265,7 +1241,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
           self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
       #
       experiments, indexed = self.index(datablock, observed)
-    except Exception, e:
+    except Exception as e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("indexing_failed_%d"%len(observed), "stop")
@@ -1281,14 +1257,13 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       assert len(experiments.goniometers()) <= 1; imgset.set_goniometer(experiments[0].goniometer)
       for expt_id, expt in enumerate(experiments):
         expt.imageset = imgset
-
 # --------------------------------------------------------------------------------
 
     self.debug_write("refine_start")
 
     try:
       experiments, indexed = self.refine(experiments, indexed)
-    except Exception, e:
+    except Exception as e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("refine_failed_%d"%len(indexed), "fail")
@@ -1298,7 +1273,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       self.debug_write("reindex_start")
       try:
         self.reindex_strong(experiments, observed)
-      except Exception, e:
+      except Exception as e:
         import traceback; traceback.print_exc()
         print str(e), "event", timestamp
         self.debug_write("reindexstrong_failed_%d"%len(indexed), "fail")
@@ -1329,7 +1304,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
     try:
       integrated = self.integrate(experiments, indexed)
-    except Exception, e:
+    except Exception as e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("integrate_failed_%d"%len(indexed), "fail")
