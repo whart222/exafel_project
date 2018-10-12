@@ -312,7 +312,7 @@ def get_uc_and_rmsd_stats(filenames, root, rank=0):
   dR = flex.double()
 
   from dxtbx.model.experiment_list import ExperimentListFactory
-  from dials.algorithms.refinement.prediction import ExperimentsPredictor
+  from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
   from libtbx.easy_pickle import load
   from scitbx.matrix import col
   for filename in filenames:
@@ -327,7 +327,7 @@ def get_uc_and_rmsd_stats(filenames, root, rank=0):
       all_uc_gamma.append(crystal.get_unit_cell().parameters()[5])
     fpickle = os.path.join(root, filename.split('refined_experiments')[0]+'indexed.pickle')
     reflections = load(fpickle)
-    ref_predictor = ExperimentsPredictor(experiments, force_stills=experiments.all_stills())
+    ref_predictor = ExperimentsPredictorFactory.from_experiments(experiments, force_stills=experiments.all_stills())
     reflections = ref_predictor(reflections)
     for refl in reflections:
       dR.append((col(refl['xyzcal.mm']) - col(refl['xyzobs.mm.value'])).length())
