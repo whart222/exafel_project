@@ -21,7 +21,7 @@ function condaEnvSetup(){
   conda install h5py mpich2 wxpython pil libtiff
 }
 
-#set the necessary data directory environemtn variables and paths
+#set the necessary data directory environment variables and paths
 function dataDirSetup(){
   export PERM=$1; mkdir $PERM
   mkdir -p $PERM/psdm/data/ExpNameDb;
@@ -33,7 +33,7 @@ function psanaEnvVar(){ #May not be necessary
   export SIT_PSDM_DATA=$SIT_ROOT
 }
 
-#pass cci username, github username and number of compilation cores as args
+#pass number of compilation cores as args
 function setupcctbx(){
   if [ ! -e $PERM/cctbx.xfel ]; then
     echo "cctbx installer not found. Acquiring."
@@ -41,8 +41,8 @@ function setupcctbx(){
     cd $PERM/cctbx.xfel
     wget https://raw.githubusercontent.com/cctbx/cctbx_project/master/libtbx/auto_build/bootstrap.py --no-check-certificate --no-check-certificate
   fi
-  python bootstrap.py hot update --builder=xfel --cciuser=$1 --sfuser=$2
-  python bootstrap.py build --builder=xfel --with-python=`which python` --nproc=$3
+  python bootstrap.py hot update --builder=dials
+  python bootstrap.py build --builder=dials --with-python=`which python` --nproc=$1
   source $PERM/cctbx.xfel/build/setpaths.sh
 }
 
@@ -50,17 +50,17 @@ function setupcctbx(){
 #                 main
 ##########################################
 
-if [ $# -lt 5 ]
+if [ $# -lt 3 ]
   then
     echo "Not enough arguments supplied"
     echo "Please specify the following arguments to correctly run the installation:
-    {environmentName} {ELversion} {cciusername} {githubusername} {compilerCores}"
-    echo "For an installation to ELversion=6, with  environmentName=myEnv, cciusername=me githubusername=me compilerCores=32 the command will be run as"
-    echo "./install.sh myEnv 6 me me 32"
+    {environmentName} {ELversion} {compilerCores}"
+    echo "For an installation to ELversion=6, with  environmentName=myEnv, compilerCores=32 the command will be run as"
+    echo "./install.sh myEnv 6 32"
     exit
 fi
 fetchConda
 condaEnvSetup $1 $2 #for Centos 6 and a simple env name
 dataDirSetup $(pwd) #use current directory as data dir
 psanaEnvVar
-setupcctbx $3 $4 $5
+setupcctbx $3 
