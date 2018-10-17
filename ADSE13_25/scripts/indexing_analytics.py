@@ -33,7 +33,9 @@ phil_scope = parse('''
   num_nodes = 32
     .type = int
     .help = Number of nodes used to do data processing. Used in timing information
-
+  num_cores_per_node = 68
+    .type = int
+    .help = Number of cores per node in the machine (default is for Cori KNL)
   out_logfile = None
     .type = str
     .help = logfile from NERSC (like slurm-xxxx) or elsewhere. Needed for picking up timing info
@@ -141,7 +143,7 @@ def run(params):
     fts.close()
   if out_logfile is not None:
     total_time = []
-    run_number = int(root.strip().split('/')[-3][1:])
+    run_number = int(os.path.abspath(root).strip().split('/')[-3][1:])
     print (run_number)
     with open(out_logfile, 'r') as flog:
       for line in flog:
@@ -151,6 +153,7 @@ def run(params):
             total_time.append(float(ax[1]))
 
     node_hours = max(total_time)*num_nodes/3600.0
+    core_hours = max(total_time)*num_nodes*num_cores_per_node/3600.0
   all_uc_a = flex.double()
   all_uc_b = flex.double()
   all_uc_c = flex.double()
@@ -195,6 +198,7 @@ def run(params):
     print ('Average time spent indexing successfully (core-secs) = ', 3600*t_idx_success/n_idx)
     if out_logfile is not None:
       print ('Total Node-hours with %d nodes = %.2f (hrs)'%(num_nodes, node_hours))
+      print ('% core utilization i.e (total indexing time)/(total core-hrs) = ', 100.0*t_idx/core_hours)
     print ('====================== Unit Cell & RMSD Statistics ============================')
     print ('a-edge (A) : %.2f +/- %.2f' % (flex.mean(all_uc_a),flex.mean_and_variance(all_uc_a).unweighted_sample_standard_deviation()))
     print ('b-edge (A) : %.2f +/- %.2f' % (flex.mean(all_uc_b),flex.mean_and_variance(all_uc_b).unweighted_sample_standard_deviation()))
@@ -350,6 +354,7 @@ if __name__ == '__main__':
     print (message)
   params = params_from_phil(sys.argv[1:])
   num_nodes = params.num_nodes #int(sys.argv[2])
+  num_cores_per_node = params.num_cores_per_node
   root = os.path.join(params.input_path, 'out')
   out_logfile = params.out_logfile
   steps_d = {}
