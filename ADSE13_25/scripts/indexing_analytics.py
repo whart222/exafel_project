@@ -123,12 +123,16 @@ def run(params):
   t_idx = 0
   t_idx_success = 0
   all_idx_cutoff_time_exceeded_event = []
+  total_xray_events = 0
+  total_images_analyzed = 0
   for ii,r in enumerate(results):
     n_hits += r[0]
     n_idx += r[1]
     t_idx += r[2]
     t_idx_success += r[3]
     all_idx_cutoff_time_exceeded_event.extend(r[4])
+    total_xray_events += r[5]
+    total_images_analyzed += r[6]
   # Write out the cutoff time exceeded events in a format that xtc_process.py can interpret for skipping events
   if indexing_time_cutoff is not None:
     fts = open('timestamps_to_skip.dat','w')
@@ -181,10 +185,14 @@ def run(params):
     print ('-'*80)
     print ('Getting stats for data in : ',root)
     print ('====================== Indexing and Timing Statistics ============================')
+    print ('Total number of X-ray events = ', total_xray_events)
+    print ('Total number of images analyzed = ', total_images_analyzed)
     print ('Number of Hits = ', n_hits)
     print ('Number of images successfully indexed = ', n_idx)
     print ('Total time spent in indexing (hrs) = ',t_idx)
-    print ('Time spent in indexing successfully (hrs) = ', t_idx_success)
+    print ('Time spent in indexing successfully (core-hrs) = ', t_idx_success)
+    print ('Average time spent indexing (core-secs) = ', 3600*t_idx/n_hits)
+    print ('Average time spent indexing successfully (core-secs) = ', 3600*t_idx_success/n_idx)
     if out_logfile is not None:
       print ('Total Node-hours with %d nodes = %.2f (hrs)'%(num_nodes, node_hours))
     print ('====================== Unit Cell & RMSD Statistics ============================')
@@ -207,7 +215,8 @@ def run(params):
 
 def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
   print ('starting hits_and_indexing_stats', rank)
-  event_number = 0
+  num_of_xray_events = 0
+  num_of_images_analyzed = 0
   hits = []
   events_list = []
   indexing_time = {}
@@ -225,8 +234,10 @@ def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
           print (line); raise
         now_s, now_ms = reverse_timestamp(now)
         now = now_s + (1e-3 * now_ms)
+        if step.strip() == 'spotfind_start':
+          num_of_images_analyzed +=1
         if step.strip() == 'start':
-          event_number += 1
+          num_of_xray_events +=1
           curr_ts, curr_ms = reverse_timestamp(ts)
           current_reverse_ts = curr_ts + (1e-3*curr_ms)
         #if '2018-05-01T14:50Z21.976' == ts:
@@ -244,6 +255,7 @@ def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
           hits.append(ts)
         if step.strip() == 'refine_start':
           indexing_time[ts]=now-prev_time
+          #print ('DEBUG',prev_step, step, now,prev_time, ts)
         current_ts = ts
         prev_step = step
         prev_time = now
@@ -297,7 +309,7 @@ def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
 
   if write_out_timings:
     fout.close()
-  return (len(hits), len(idx_successful_time), sum(idx_attempt_time)/3600.0, sum(idx_successful_time)/3600.0, idx_cutoff_time_exceeded_event)
+  return (len(hits), len(idx_successful_time), sum(idx_attempt_time)/3600.0, sum(idx_successful_time)/3600.0, idx_cutoff_time_exceeded_event, num_of_xray_events, num_of_images_analyzed)
 
 # Extract timing information from log file
 def get_uc_and_rmsd_stats(filenames, root, rank=0):
