@@ -42,7 +42,7 @@ fi
 
 if [ "${CMDMODE}" = "pythonprof" ]; then
     libtbx.python -m cProfile -s tottime libtbx.python /cctbx/modules/exafel_project/ADSE13_25/xtc_process_iota_srs.py ${cctbx_args}
-  
+
 elif [ "${CMDMODE}" = "strace" ]; then
     strace -ttt -f -o $$.log libtbx.python /cctbx/modules/exafel_project/ADSE13_25/xtc_process_iota_srs.py ${cctbx_args}
 
@@ -53,7 +53,7 @@ elif [ "${CMDMODE}" = "debug" ]; then
 elif [ "${CMDMODE}" = "debug_timestamp" ]; then
     #python ${PWD}/xtc_process_iota_srs_ps2.py ${cctbx_args}
     libtbx.python ${PWD}/xtc_process.py ${cctbx_args}
-  
+
 else
     echo "Running in production mode"
     #libtbx.python /cctbx/modules/exafel_project/ADSE13_25/xtc_process_iota_srs.py ${cctbx_args}

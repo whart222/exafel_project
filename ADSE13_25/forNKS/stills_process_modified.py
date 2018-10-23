@@ -505,7 +505,7 @@ class Processor(object):
         ''' Asmit Code here for printing out detector displacement '''
         image_identifier = datablock.extract_imagesets()[0].get_image_identifier(0)
         self.move_detector_to_bring_calc_spots_onto_obs(experiments.detectors()[0], experiments.beams()[0], indexed, image_identifier)
-        ''' End Asmit code ''' 
+        ''' End Asmit code '''
       else:
         print("Indexing turned off. Exiting")
         return
@@ -929,13 +929,14 @@ class Processor(object):
 
       # Create a tar archive of the integration dictionary pickles
       if len(self.all_int_pickles) > 0 and self.params.output.integration_pickle:
-        import tarfile, StringIO, time
+        import tarfile, time
+        from six.moves import StringIO
         from six.moves import cPickle as pickle
         tar_template_integration_pickle = self.params.output.integration_pickle.replace('%d', '%s')
         outfile = os.path.join(self.params.output.output_dir, tar_template_integration_pickle%('x',self.composite_tag)) + ".tar"
         tar = tarfile.TarFile(outfile,"w")
         for i, (fname, d) in enumerate(zip(self.all_int_pickle_filenames, self.all_int_pickles)):
-          string = StringIO.StringIO(pickle.dumps(d, protocol=2))
+          string = StringIO(pickle.dumps(d, protocol=2))
           info = tarfile.TarInfo(name=fname)
           info.size=len(string.buf)
           info.mtime = time.time()

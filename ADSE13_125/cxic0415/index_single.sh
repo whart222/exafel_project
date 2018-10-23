@@ -43,16 +43,16 @@ fi
 
 if [ "${CMDMODE}" = "pythonprof" ]; then
     python -m cProfile -s tottime python /tmp/xtc_process.py ${cctbx_args}
-  
+
 elif [ "${CMDMODE}" = "strace" ]; then
     strace -ttt -f -o $$.log python /tmp/xtc_process.py ${cctbx_args}
 
 elif [ "${CMDMODE}" = "debug" ]; then
     python ${PWD}/tmp/xtc_process.py ${cctbx_args}
-  
+
 else
     cctbx.xfel.xtc_process ${cctbx_args}
-  
+
 fi
 
 

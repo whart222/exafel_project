@@ -63,4 +63,4 @@ fetchConda
 condaEnvSetup $1 $2 #for Centos 6 and a simple env name
 dataDirSetup $(pwd) #use current directory as data dir
 psanaEnvVar
-setupcctbx $3 
+setupcctbx $3
