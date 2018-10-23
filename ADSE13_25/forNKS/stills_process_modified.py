@@ -929,7 +929,8 @@ class Processor(object):
 
       # Create a tar archive of the integration dictionary pickles
       if len(self.all_int_pickles) > 0 and self.params.output.integration_pickle:
-        import tarfile, StringIO, time, cPickle as pickle
+        import tarfile, StringIO, time
+        from six.moves import cPickle as pickle
         tar_template_integration_pickle = self.params.output.integration_pickle.replace('%d', '%s')
         outfile = os.path.join(self.params.output.output_dir, tar_template_integration_pickle%('x',self.composite_tag)) + ".tar"
         tar = tarfile.TarFile(outfile,"w")
