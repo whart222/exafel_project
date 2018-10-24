@@ -1,14 +1,8 @@
-# *NOTE*
-# - The ENV _proxy lines are specific for building this docker image at SLAC.
-# - For lcls2 and cctbx repos, you can use git clone: e.g.
-#   -- replace ADD lcls2 lcls2 with RUN git clone https://github.com/slac-lcls/lcls2.git
-#   -- replace all the cctbx build lines with
-#      RUN mkdir cctbx &&\
-#          cd cctbx &&\
-#          wget https://raw.githubusercontent.com/cctbx/cctbx_project/master/libtbx/auto_build/bootstrap.py &&\
-#          python bootstrap.py hot update build --builder=dials --with-python=/opt/conda/bin/python --nproc=8 &&\ 
-#          cd ..
+# Dockerfile for building cctbx.xfel with PSANA-2
+# Just run 'docker build .' (please include the dot) and wait for the image to build (might take some time)
+# Currently MPI libraries are being hardcoded in the LD_LIBRARY_PATH for Cori PII specific applications
 FROM centos:centos7
+MAINTAINER Asmit Bhowmick <abhowmick@lbl.gov>
 
 RUN yum clean all && \
     yum -y update && \
@@ -27,36 +21,26 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda2-latest-Linux-x86
     source ~/.bashrc && \
     conda update -y conda && \
     conda update -y --all && \
-    conda install numpy cython cmake git && \
-    conda install --channel conda-forge "mpich>=3" mpi4py h5py libtiff orderedset &&\
-    conda install future wxpython pillow \
-                  mock pytest jinja2 scikit-learn tabulate &&\
-    conda install rapidjson &&\
-    python -m pip install procrunner &&\
-    conda install --channel conda-forge versioneer &&\
-    conda install mongodb pymongo requests &&\
+
+    conda install -y -c lcls-ii psana && \
+    conda install -y future ipython reportlab h5py mpich2 wxpython pillow libtiff mock pytest jinja2 \
+      scikit-learn tabulate tqdm pytables scons mysql-python && \
+    conda install -y --channel conda-forge orderedset && \
+    python -m pip install procrunner && \
+    rm -rf /opt/conda/lib/python2.7/site-packages/numexpr-2.6.2-py2.7.egg-info && \
     conda clean -y --all
 
 SHELL ["/bin/bash", "-c"]
 ENV BASH_ENV ~/.bashrc
-
-# build psana2 without psdaq
-ENV PYTHONPATH=/lcls2/install/lib/python2.7/site-packages
-ENV PATH=/lcls2/install/bin:/lcls2/build/bin${PATH}
-RUN git clone https://github.com/slac-lcls/lcls2.git
-RUN cd lcls2 && \
-    ./build_all.sh -d && \
-    cd ..
-
+ENV PYTHONPATH=/opt/conda/lib/python2.7/site-packages
 # build cctbx
 RUN mkdir cctbx &&\
-	cd cctbx &&\
-	wget https://raw.githubusercontent.com/cctbx/cctbx_project/master/libtbx/auto_build/bootstrap.py &&\
-	python bootstrap.py hot update build --builder=dials --with-python=/opt/conda/bin/python --nproc=4 &&\
- 	cd ..
-
-RUN conda uninstall --force mpich 
-RUN yum -y install strace
+        cd cctbx &&\
+        wget https://raw.githubusercontent.com/cctbx/cctbx_project/master/libtbx/auto_build/bootstrap.py &&\
+        python bootstrap.py hot update build --builder=dials --with-python=/opt/conda/bin/python --nproc=4 &&\
+        cd .. &&\
+        conda uninstall --force mpich2 && \
+        yum -y install strace
 
 # setup environments for psana2 and cctbx
 ENV CONDA_EXE=/opt/conda/bin/conda
@@ -72,9 +56,10 @@ ENV PATH=/cctbx/build/bin:/lcls2/install/bin:/lcls2/build/bin:/opt/rh/devtoolset
 ENV PCP_DIR=/opt/rh/devtoolset-7/root
 ENV PERL5LIB=/opt/rh/devtoolset-7/root//usr/lib64/perl5/vendor_perl:/opt/rh/devtoolset-7/root/usr/lib/perl5:/opt/rh/devtoolset-7/root//usr/share/perl5/vendor_perl
 ENV PMI_MMAP_SYNC_WAIT_TIME=600
-ENV PYTHONPATH=/lcls2/install/lib/python2.7/site-packages
+ENV PYTHONPATH=/opt/conda/lib/python2.7/site-packages
 ENV HOME=/tmp
 
-# Clone exafel_project and configure it 
-ADD exafel_project cctbx/modules/exafel_project
-RUN cd cctbx/build/ && source setpaths.sh && libtbx.configure exafel_project && make
+# Clone exafel_project and configure it
+RUN cd /cctbx/modules/ && \
+  git clone https://github.com/ExaFEL/exafel_project.git &&\
+  cd /cctbx/build/ && source setpaths.sh && libtbx.configure exafel_project && make
