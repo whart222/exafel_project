@@ -338,32 +338,6 @@ xtc_phil_str = '''
               processes and only N*4 files will be created. Ideally, match   \
               stride to the number of processors per node.
   }
-  iota {
-    method = off *random_sub_sampling
-      .type = choice
-      .help = Type of IOTA processing to be done. \
-              off : No IOTA processing is done. \
-              random-sub-sampling : randomly sub-sample observed bragg spots and index. Can be done multiple times. See options for random-sub-sampling if this is used.
-    random_sub_sampling {
-      ntrials = 10
-        .type = int
-        .help = Number of random sub-samples to be selected
-      fraction_sub_sample = 0.2
-        .type = float
-        .help = fraction of sample to be sub-sampled. Should be between 0 and 1
-      consensus_function = *unit_cell
-        .type = choice
-        .help = choose the type of consensus function to be employed for random_sub_sampling. More details \
-                in the functions themselves
-      show_plot = False
-        .type = bool
-        .help = Flag to indicate whether plots for clustering are to be displayed. Useful for debugging
-      no_outlier_rejection_and_candidates_refinement=False
-        .type = bool
-        .help = Flag to indicate if candidate basis vectors should be refined and whether \
-                outlier rejectionis needed
-  }
-}
 '''
 
 from dials.command_line.stills_process import dials_phil_str, program_defaults_phil_str
