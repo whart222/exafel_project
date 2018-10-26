@@ -1228,11 +1228,22 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
             experiments_list.append(experiments_tmp)
           except Exception as e:
             print('Indexing failed for some reason')
+        # ---------------------------------------------------
+        # Only for debugging 
+        debug_pickle = False
+        debug_load = True
+        if debug_pickle:
+          from libtbx.easy_pickle import load, dump 
+          if debug_load:
+            experiments_list = load('explist.pickle')
+          else:
+            dump('explist.pickle', experiments_list)
+        # -------------------------------------------------- 
         if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
           from exafel_project.ADSE13_25.clustering.old_consensus_functions import get_uc_consensus as get_consensus
           #known_crystal_models = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model = False)
           if len(experiments_list) > 0:
-            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=False, return_only_first_indexed_model=False, finalize_method=None, clustering_params=None)
+            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=True, return_only_first_indexed_model=False, finalize_method=None, clustering_params=None)
             self.known_crystal_models = known_crystal_models
           print ('IOTA: Reindexing with best chosen crystal model')
           # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
