@@ -709,7 +709,13 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     all_runs = []
     xrun_num = params.input.run_num.strip().split(',')
     for x in xrun_num:
-      all_runs.extend([int(z) for z in x.split('-')])
+      z = x.split('-')
+      if len(z) == 1:
+        all_runs.extend(int(z[0]))
+      elif len(z) == 2:
+        all_runs.extend(range(int(z[0]), int(z[1])+1))
+      else:
+        print ('cant extend run(s)', str(x))
     total_runs = len(list(set(all_runs)))
     print 'TOTAL_RUNS',total_runs
 
