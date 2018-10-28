@@ -55,7 +55,10 @@ phil_scope = parse('''
     .type = float
     .help = Maximum time that indexing of a certain image should take (in seconds). If this is set, \
             one can get the list of timestamps that exceed this cutoff
-
+  wall_time = None
+    .type = float
+    .help = wall time in seconds taken for job to finish. This can be used in lieu of out_logfile option for getting timing option \
+            If this and out_logfile is supplied, this takes precedence
 ''')
 
 def params_from_phil(args):
@@ -141,7 +144,9 @@ def run(params):
     for evt in all_idx_cutoff_time_exceeded_event:
       fts.write('psanagpu999,%s,%s,fail\n'%(evt,evt))
     fts.close()
-  if out_logfile is not None:
+  node_hours = None
+  core_hours = None
+  if out_logfile is not None and wall_time is None:
     total_time = []
     run_number = int(os.path.abspath(root).strip().split('/')[-3][1:])
     print (run_number)
@@ -151,9 +156,13 @@ def run(params):
           ax = line.split()
           if int(ax[-1]) == run_number:
             total_time.append(float(ax[1]))
-
     node_hours = max(total_time)*num_nodes/3600.0
     core_hours = max(total_time)*num_nodes*num_cores_per_node/3600.0
+
+  if wall_time is not None:
+    node_hours = wall_time*num_nodes/3600.0
+    core_hours = wall_time*num_nodes*num_cores_per_node/3600.0
+
   all_uc_a = flex.double()
   all_uc_b = flex.double()
   all_uc_c = flex.double()
@@ -196,7 +205,7 @@ def run(params):
     print ('Time spent in indexing successfully (core-hrs) = ', t_idx_success)
     print ('Average time spent indexing (core-secs) = ', 3600*t_idx/n_hits)
     print ('Average time spent indexing successfully (core-secs) = ', 3600*t_idx_success/n_idx)
-    if out_logfile is not None:
+    if node_hours is not None:
       print ('Total Node-hours with %d nodes = %.2f (hrs)'%(num_nodes, node_hours))
       print ('% core utilization i.e (total indexing time)/(total core-hrs) = ', 100.0*t_idx/core_hours)
     print ('====================== Unit Cell & RMSD Statistics ============================')

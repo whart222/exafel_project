@@ -16,7 +16,7 @@ phil_scope = parse('''
   input_path = .
     .type = str
     .help = path to where the debug txt files are located
-  num_nodes = 32
+  num_nodes = 100
     .type = int
     .help = Number of nodes used to do data processing. Used in timing information
   num_cores_per_node = 68
@@ -25,6 +25,9 @@ phil_scope = parse('''
   wall_time = 3600
     .type = int
     .help = total wall time (seconds) taken for job to finish. Used for plotting node-partitioning
+  plot_title = Computational weather plot
+    .type = str
+    .help = title of the computational weather plot
 ''')
 
 def params_from_phil(args):
@@ -72,6 +75,7 @@ def run(params):
     plt.plot([0,params.wall_time], [i*params.num_cores_per_node-0.5, i*params.num_cores_per_node-0.5], 'r-')
   plt.xlabel('Wall time (sec)')
   plt.ylabel('MPI Rank Number')
+  plt.title(params.plot_title)
   plt.show()
 
 if __name__ == '__main__':
