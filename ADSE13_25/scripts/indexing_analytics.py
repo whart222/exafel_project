@@ -161,14 +161,14 @@ def run(params):
           if int(ax[-1]) == run_number:
             total_time.append(float(ax[1]))
     node_hours = max(total_time)*num_nodes/3600.0
-    if num_of_cores is not None:
+    if num_cores is not None:
       core_hours = max(total_time)*num_cores/3600.0
     else:
       core_hours = max(total_time)*num_nodes*num_cores_per_node/3600.0
 
   if wall_time is not None:
     node_hours = wall_time*num_nodes/3600.0
-    if num_of_cores is not None:
+    if num_cores is not None:
       core_hours = wall_time*num_cores/3600.0
     else:
       core_hours = wall_time*num_nodes*num_cores_per_node/3600.0
