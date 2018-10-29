@@ -777,6 +777,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
         raise Sorry("This script currently is supported only for client-server MPI.")
       if params.mp.method == "mpi" and params.mp.mpi.method == 'client_server' and size > 2:
         run_count += 1
+        print ('RUN_COUNT_COMBO = ',run_count,' ', run.run())
         # process fractions only works in idx-striping mode
         if params.dispatch.process_percent:
           raise Sorry("Process percent only works in striping mode.")

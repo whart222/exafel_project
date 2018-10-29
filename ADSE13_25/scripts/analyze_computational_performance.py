@@ -28,6 +28,13 @@ phil_scope = parse('''
   plot_title = Computational weather plot
     .type = str
     .help = title of the computational weather plot
+  pickle_plot = False
+    .type = bool
+    .help = If True, will pickle matplotlib session so that it can be opened later for analysis/viewing \
+            https://stackoverflow.com/questions/29160177/matplotlib-save-file-to-be-reedited-later-in-ipython
+  pickle_filename = fig_object.pickle
+    .type = str
+    .help = Default name of pickled matplotlib plot saved to disk
 ''')
 
 def params_from_phil(args):
@@ -47,6 +54,7 @@ def run(params):
   counter = 0
   reference = None
   root=params.input_path
+  fig_object = plt.figure()
   for filename in os.listdir(root):
     if os.path.splitext(filename)[1] != '.txt': continue
     if 'debug' not in filename: continue
@@ -76,6 +84,9 @@ def run(params):
   plt.xlabel('Wall time (sec)')
   plt.ylabel('MPI Rank Number')
   plt.title(params.plot_title)
+  if params.pickle_plot:
+    from libtbx.easy_pickle import dump
+    dump('%s'%params.pickle_filename, fig_object)
   plt.show()
 
 if __name__ == '__main__':

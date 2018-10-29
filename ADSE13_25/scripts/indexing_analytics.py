@@ -33,6 +33,10 @@ phil_scope = parse('''
   num_nodes = 32
     .type = int
     .help = Number of nodes used to do data processing. Used in timing information
+  num_cores = None
+    .type = int
+    .help = Number of cores used to do data processing. Used in timing information. If provided, will \
+            be used instead of num_cores_per_node. Useful for cases where an entire node was not used
   num_cores_per_node = 68
     .type = int
     .help = Number of cores per node in the machine (default is for Cori KNL)
@@ -157,11 +161,17 @@ def run(params):
           if int(ax[-1]) == run_number:
             total_time.append(float(ax[1]))
     node_hours = max(total_time)*num_nodes/3600.0
-    core_hours = max(total_time)*num_nodes*num_cores_per_node/3600.0
+    if num_of_cores is not None:
+      core_hours = max(total_time)*num_cores/3600.0
+    else:
+      core_hours = max(total_time)*num_nodes*num_cores_per_node/3600.0
 
   if wall_time is not None:
     node_hours = wall_time*num_nodes/3600.0
-    core_hours = wall_time*num_nodes*num_cores_per_node/3600.0
+    if num_of_cores is not None:
+      core_hours = wall_time*num_cores/3600.0
+    else:
+      core_hours = wall_time*num_nodes*num_cores_per_node/3600.0
 
   all_uc_a = flex.double()
   all_uc_b = flex.double()
@@ -364,6 +374,8 @@ if __name__ == '__main__':
   params = params_from_phil(sys.argv[1:])
   num_nodes = params.num_nodes #int(sys.argv[2])
   num_cores_per_node = params.num_cores_per_node
+  num_cores = params.num_cores
+  wall_time = params.wall_time
   root = os.path.join(params.input_path, 'out')
   out_logfile = params.out_logfile
   steps_d = {}
