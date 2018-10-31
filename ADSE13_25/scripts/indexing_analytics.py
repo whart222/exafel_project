@@ -200,6 +200,7 @@ def run(params):
                           'gamma':r[5][jj],
                           'n_img':0})
   info_list.append(info)
+  n_lattices = len(all_uc_a)
   # Now print out all relevant statistics
   if True:
     print ('-'*80)
@@ -211,6 +212,7 @@ def run(params):
     print ('Total number of images analyzed = ', total_images_analyzed)
     print ('Number of Hits = ', n_hits)
     print ('Number of images successfully indexed = ', n_idx)
+    print ('Number of lattices = ', n_lattices)
     print ('Total time spent in indexing (hrs) = ',t_idx)
     print ('Time spent in indexing successfully (core-hrs) = ', t_idx_success)
     print ('Average time spent indexing (core-secs) = ', 3600*t_idx/n_hits)
