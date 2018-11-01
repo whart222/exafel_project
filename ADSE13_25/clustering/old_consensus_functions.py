@@ -57,18 +57,65 @@ class clustering_manager(group_args):
     n_cluster = 0
 #
 #
-    for ic in range(NN):
-      # test the density & rho
-      item_idx = delta_order[ic]
-      if ic != 0:
-        if delta[item_idx] <= 0.25*delta[delta_order[0]]: # too low to be a medoid
-          continue
-      #from IPython import embed; embed()
-      item_rho_order = rho_order_list.index(item_idx)
-      if (item_rho_order)/NN < MAX_PERCENTILE_RHO:
+    import numpy as np
+    pick_top_solution=False
+    rho_stdev = np.std(rho.as_numpy_array())
+    delta_stdev = np.std(delta.as_numpy_array())
+    if rho_stdev !=0.0 and delta_stdev !=0:
+      rho_z=(rho-np.mean(rho.as_numpy_array()))/(rho_stdev)
+      delta_z=(delta-np.mean(delta.as_numpy_array()))/(delta_stdev)
+    else:
+      pick_top_solution=True
+      if rho_stdev == 0.0:
+        centroids = [flex.first_index(delta,flex.max(delta))]
+      elif delta_stdev == 0.0:
+        centroids = [flex.first_index(rho,flex.max(rho))]
+
+    significant_delta = []
+    significant_rho = []
+    debug_fix_clustering = True
+    if debug_fix_clustering:
+      if not pick_top_solution:
+        for ic in range(NN):
+          # test the density & rho
+          if delta_z[ic] > 1.0:
+            significant_delta.append(ic)
+          if rho_z[ic] > 1.0:
+            significant_rho.append(ic)
+        centroid_candidates = list(set(significant_delta).intersection(set(significant_rho))) 
+        # Now compare the relative orders of the max delta_z and max rho_z to make sure they are within 1 stdev
+        centroids = []
+        max_delta_z_candidates = -999.9
+        max_rho_z_candidates = -999.9
+        for ic in centroid_candidates:
+          if delta_z[ic] > max_delta_z_candidates:
+            max_delta_z_candidates = delta_z[ic]
+          if rho_z[ic] > max_rho_z_candidates:
+            max_rho_z_candidates = rho_z[ic]
+        for ic in centroid_candidates:
+          if max_delta_z_candidates - delta_z[ic] < 1.0 and max_rho_z_candidates - rho_z[ic] < 1.0:
+            centroids.append(ic)
+
+      item_idxs = [delta_order[ic] for ic,centroid in enumerate(centroids)]
+      #from IPython import embed; embed(); exit()
+      for item_idx in item_idxs:
         cluster_id[item_idx] = n_cluster
-        print ('CLUSTERING_STATS',ic,item_idx,item_rho_order,cluster_id[item_idx])
+        print ('CLUSTERING_STATS',item_idx,cluster_id[item_idx] )
         n_cluster +=1
+        ####
+    else:
+      for ic in range(NN):
+        item_idx = delta_order[ic]
+        if ic != 0:
+          if delta[item_idx] <= 0.25*delta[delta_order[0]]: # too low to be a medoid
+            continue
+        #from IPython import embed; embed()
+        item_rho_order = rho_order_list.index(item_idx)
+        if (item_rho_order)/NN < MAX_PERCENTILE_RHO:
+          cluster_id[item_idx] = n_cluster
+          print ('CLUSTERING_STATS',ic,item_idx,item_rho_order,cluster_id[item_idx])
+          n_cluster +=1
+    ###
 #
 #
     print ('Found %d clusters'%n_cluster)
@@ -244,6 +291,7 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
     from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding
     #plot_with_dimensional_embedding(1-Dij_ori[1]/flex.max(Dij_ori[1]), show_plot=True)
     for cluster in Dij_ori:
+      #import pdb; pdb.set_trace()
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85)
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       #from IPython import embed; embed()
