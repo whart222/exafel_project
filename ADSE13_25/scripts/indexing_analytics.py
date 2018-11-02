@@ -23,13 +23,16 @@ Run it like mpirun -n nproc libtbx.python indexing_analytics.py params.phil
 
 from libtbx.phil import parse
 phil_scope = parse('''
-  input_path = .
-    .type = str
+  input_path = None
+    .multiple = True
+    .type = path
     .help = input_path should be like that used at LCLS i.e full path to run_number/trial_rg \
             Assumes folder structure \
             Input Path    -----> out -----> debug folder \
                           -----> pickle and json files \
                           -----> stdout
+            You can specificy multiple paths. In that case, the unit cells and RMSD info will be
+            only for the common set of images indexed
   num_nodes = 32
     .type = int
     .help = Number of nodes used to do data processing. Used in timing information
@@ -92,9 +95,10 @@ def add_step(step, duration):
   steps_d[step].append(duration)
 
 
-def run(params):
+def run(params, root, common_set=None):
   iterable = []
   iterable2 = []
+  debug_root = os.path.join(root, 'debug')
   print ('start appending')
   for filename in os.listdir(debug_root):
     if os.path.splitext(filename)[1] != ".txt": continue
@@ -119,12 +123,12 @@ def run(params):
     results = comm.gather(results, root=0)
     # Now get uc and rmsd info
     iterable2 = [iterable2[i] for i in range(len(iterable2)) if (i+rank)%size == 0]
-    results2 = get_uc_and_rmsd_stats(iterable2, root,rank=rank)
+    results2 = get_uc_and_rmsd_stats(iterable2, root,rank=rank,common_set=common_set)
     results2 = comm.gather(results2, root=0)
     if rank != 0: return
   else:
     results = [get_hits_and_indexing_stats(iterable, debug_root)]
-    results2 = [get_uc_and_rmsd_stats(iterable2, root)]
+    results2 = [get_uc_and_rmsd_stats(iterable2, root, rank=0, common_set=common_set)]
   # Now evaulate summary statistics
   print ('Now evaluating summary statistics')
   n_hits = 0
@@ -212,7 +216,10 @@ def run(params):
     print ('Total number of images analyzed = ', total_images_analyzed)
     print ('Number of Hits = ', n_hits)
     print ('Number of images successfully indexed = ', n_idx)
-    print ('Number of lattices = ', n_lattices)
+    if common_set is None:
+      print ('Number of lattices = ', n_lattices)
+    else:
+      print ('Number of common lattices', n_lattices)
     print ('Total time spent in indexing (hrs) = ',t_idx)
     print ('Time spent in indexing successfully (core-hrs) = ', t_idx_success)
     print ('Average time spent indexing (core-secs) = ', 3600*t_idx/n_hits)
@@ -220,7 +227,10 @@ def run(params):
     if node_hours is not None:
       print ('Total Node-hours with %d nodes = %.2f (hrs)'%(num_nodes, node_hours))
       print ('% core utilization i.e (total indexing time)/(total core-hrs) = ', 100.0*t_idx/core_hours)
-    print ('====================== Unit Cell & RMSD Statistics ============================')
+    if common_set is None:
+      print ('====================== Unit Cell & RMSD Statistics ============================')
+    else:
+      print ('====================== Unit Cell & RMSD Statistics from Common Set ============================')
     print ('a-edge (A) : %.2f +/- %.2f' % (flex.mean(all_uc_a),flex.mean_and_variance(all_uc_a).unweighted_sample_standard_deviation()))
     print ('b-edge (A) : %.2f +/- %.2f' % (flex.mean(all_uc_b),flex.mean_and_variance(all_uc_b).unweighted_sample_standard_deviation()))
     print ('c-edge (A) : %.2f +/- %.2f' % (flex.mean(all_uc_c),flex.mean_and_variance(all_uc_c).unweighted_sample_standard_deviation()))
@@ -228,6 +238,7 @@ def run(params):
     print ('beta (deg) : %.2f +/- %.2f' % (flex.mean(all_uc_beta),flex.mean_and_variance(all_uc_beta).unweighted_sample_standard_deviation()))
     print ('gamma (deg) : %.2f +/- %.2f' % (flex.mean(all_uc_gamma),flex.mean_and_variance(all_uc_gamma).unweighted_sample_standard_deviation()))
     print ('Total RMSD i.e calc - obs for Bragg spots (um) = ', 1000.0*math.sqrt(dR.dot(dR)/len(dR)))
+  print ('-'*80)
   if show_plot:
     import xfel.ui.components.xfel_gui_plotter as pltr
     plotter = pltr.PopUpCharts()
@@ -337,7 +348,7 @@ def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
   return (len(hits), len(idx_successful_time), sum(idx_attempt_time)/3600.0, sum(idx_successful_time)/3600.0, idx_cutoff_time_exceeded_event, num_of_xray_events, num_of_images_analyzed)
 
 # Extract timing information from log file
-def get_uc_and_rmsd_stats(filenames, root, rank=0):
+def get_uc_and_rmsd_stats(filenames, root, rank=0, common_set=None):
   print ('Getting unit cell information')
   # Unit cell and RMSD statistics for that run
   all_uc_a = flex.double()
@@ -352,10 +363,17 @@ def get_uc_and_rmsd_stats(filenames, root, rank=0):
   from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
   from libtbx.easy_pickle import load
   from scitbx.matrix import col
+  if common_set is not None:
+    print ('Using %d common set images to report unit cell and RMSD statistics'%(len(common_set)))
   for filename in filenames:
     fjson=os.path.join(root, filename)
     experiments = ExperimentListFactory.from_json_file(fjson)
-    for crystal in experiments.crystals():
+    expt_id_common = []
+    for ii,crystal in enumerate(experiments.crystals()):
+      if common_set is not None:
+        cbf_now = experiments[ii].imageset.get_image_identifier(0).split('/')[-1]
+        if cbf_now not in common_set: continue
+        expt_id_common.append(ii)
       all_uc_a.append(crystal.get_unit_cell().parameters()[0])
       all_uc_b.append(crystal.get_unit_cell().parameters()[1])
       all_uc_c.append(crystal.get_unit_cell().parameters()[2])
@@ -367,8 +385,28 @@ def get_uc_and_rmsd_stats(filenames, root, rank=0):
     ref_predictor = ExperimentsPredictorFactory.from_experiments(experiments, force_stills=experiments.all_stills())
     reflections = ref_predictor(reflections)
     for refl in reflections:
+      if common_set is not None:
+        if refl['id'] not in expt_id_common: continue
       dR.append((col(refl['xyzcal.mm']) - col(refl['xyzobs.mm.value'])).length())
   return all_uc_a, all_uc_b, all_uc_c, all_uc_alpha, all_uc_beta, all_uc_gamma, dR
+
+def get_common_set(roots):
+  ''' Function to get common set of images indexed in multiple folders. Based on CBF filenames '''
+  from dxtbx.model.experiment_list import ExperimentListFactory
+  cbf = {}
+  for root in roots:
+    cbf[root] = []
+    for filename in os.listdir(root):
+      if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
+      explist=ExperimentListFactory.from_json_file(os.path.join(root,filename))
+      for exp in explist:
+        cbf[root].append(exp.imageset.get_image_identifier(0).split('/')[-1])
+  # Now take intersection
+  common_set = set(cbf[roots[0]])
+  for ii in range(1, len(roots)):
+    common_set = common_set.intersection(set(cbf[roots[ii]]))
+
+  return list(common_set)
 
 if __name__ == '__main__':
   if '--help' in sys.argv[1:] or '--h' in sys.argv[1:]:
@@ -378,13 +416,20 @@ if __name__ == '__main__':
   num_cores_per_node = params.num_cores_per_node
   num_cores = params.num_cores
   wall_time = params.wall_time
-  root = os.path.join(params.input_path, 'out')
+  if len(params.input_path) == 0:
+    params.input_path=['.']
+  roots = []
+  for input_path in params.input_path:
+    roots.append(os.path.join(input_path, 'out'))
   out_logfile = params.out_logfile
   steps_d = {}
-  debug_root = os.path.join(root, 'debug')
   debug_mode=False
   write_out_timings=params.write_out_timings
   string_to_search_for = params.string_to_search_for
   show_plot = params.show_plot
   indexing_time_cutoff = params.indexing_time_cutoff
-  run(params)
+  common_set=None
+  if len(roots) > 1:
+    common_set = get_common_set(roots)
+  for root in roots:
+    run(params, root, common_set=common_set)
