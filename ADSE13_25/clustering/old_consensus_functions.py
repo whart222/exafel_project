@@ -1,7 +1,7 @@
 from __future__ import division
 from cctbx.array_family import flex
 from libtbx import group_args
-import os
+import os,math
 #
 # List of consensus functions to be implemented
 # 1. unit cell
@@ -33,6 +33,17 @@ def get_dij_ori(cryst1, cryst2, is_reciprocal=True):
   #print 'difference z-score = ', cryst1_ori.difference_Z_score(cryst2_ori_best)
   return cryst1_ori.difference_Z_score(cryst2_ori_best)
 
+def get_gaussian_rho(Dij, d_c):
+  NN = Dij.focus()[0]
+  rho = flex.double(NN)
+  mu = flex.mean(Dij.as_1d())
+  sigma = flex.mean_and_variance(Dij.as_1d()).unweighted_sample_standard_deviation()
+  for i in range(NN):
+    for j in range(NN):
+      z = (Dij[i*NN + j]-mu)/sigma
+      print (z,'AA')
+      rho[i] += math.exp(-z*z)
+  return rho;
 
 class clustering_manager(group_args):
   def __init__(self, **kwargs):
@@ -56,14 +67,12 @@ class clustering_manager(group_args):
     MAX_PERCENTILE_RHO = self.max_percentile_rho # cluster centers have to be in the top percentile
     n_cluster = 0
 #
-#
-    import numpy as np
     pick_top_solution=False
-    rho_stdev = np.std(rho.as_numpy_array())
-    delta_stdev = np.std(delta.as_numpy_array())
+    rho_stdev = flex.mean_and_variance(rho.as_double()).unweighted_sample_standard_deviation()
+    delta_stdev = flex.mean_and_variance(delta).unweighted_sample_standard_deviation()
     if rho_stdev !=0.0 and delta_stdev !=0:
-      rho_z=(rho-np.mean(rho.as_numpy_array()))/(rho_stdev)
-      delta_z=(delta-np.mean(delta.as_numpy_array()))/(delta_stdev)
+      rho_z=(rho.as_double()-flex.mean(rho.as_double()))/(rho_stdev)
+      delta_z=(delta-flex.mean(delta))/(delta_stdev)
     else:
       pick_top_solution=True
       if rho_stdev == 0.0:
@@ -76,13 +85,15 @@ class clustering_manager(group_args):
     debug_fix_clustering = True
     if debug_fix_clustering:
       if not pick_top_solution:
+        delta_z_cutoff = min(1.0, max(delta_z))
+        rho_z_cutoff = min(1.0, max(rho_z))
         for ic in range(NN):
           # test the density & rho
-          if delta_z[ic] > 1.0:
+          if delta_z[ic] >= delta_z_cutoff:
             significant_delta.append(ic)
-          if rho_z[ic] > 1.0:
+          if rho_z[ic] >= rho_z_cutoff:
             significant_rho.append(ic)
-        centroid_candidates = list(set(significant_delta).intersection(set(significant_rho))) 
+        centroid_candidates = list(set(significant_delta).intersection(set(significant_rho)))
         # Now compare the relative orders of the max delta_z and max rho_z to make sure they are within 1 stdev
         centroids = []
         max_delta_z_candidates = -999.9
@@ -97,7 +108,6 @@ class clustering_manager(group_args):
             centroids.append(ic)
 
       item_idxs = [delta_order[ic] for ic,centroid in enumerate(centroids)]
-      #from IPython import embed; embed(); exit()
       for item_idx in item_idxs:
         cluster_id[item_idx] = n_cluster
         print ('CLUSTERING_STATS',item_idx,cluster_id[item_idx] )
@@ -109,7 +119,6 @@ class clustering_manager(group_args):
         if ic != 0:
           if delta[item_idx] <= 0.25*delta[delta_order[0]]: # too low to be a medoid
             continue
-        #from IPython import embed; embed()
         item_rho_order = rho_order_list.index(item_idx)
         if (item_rho_order)/NN < MAX_PERCENTILE_RHO:
           cluster_id[item_idx] = n_cluster
@@ -123,7 +132,6 @@ class clustering_manager(group_args):
       if cluster_id[x] >= 0:
         print ("XC", x,cluster_id[x], rho[x], delta[x])
     self.cluster_id_maxima = cluster_id.deep_copy()
-    #import pdb; pdb.set_trace()
     R.cluster_assignment(rho_order, cluster_id)
     self.cluster_id_full = cluster_id.deep_copy()
 
@@ -206,9 +214,10 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
   NN = len(MM)
   from cctbx.uctbx.determine_unit_cell import NCDist_flatten
   Dij = NCDist_flatten(MM_double)
-  #from IPython import embed; embed(); exit()
-  from scitbx.math import five_number_summary
-  d_c = 6.13 #five_number_summary(list(Dij))[1]
+  d_c = 6.13
+  #FIXME should be a PHIL param
+  if len(cells) < 5:
+    return [experiments_list[0].crystals()[0]], None
   CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=0.95)
   n_cluster = 1+flex.max(CM.cluster_id_final)
   print (len(cells), ' datapoints have been analyzed')
@@ -225,7 +234,6 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
   if show_plot:
     # Decision graph
     import matplotlib.pyplot as plt
-    #from IPython import embed; embed(); exit()
     plt.plot(CM.rho, CM.delta, "r.", markersize=3.)
     for x in xrange(NN):
       if CM.cluster_id_maxima[x] >=0:
@@ -249,7 +257,6 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
   #
   do_orientational_clustering = not return_only_first_indexed_model # temporary.
   dxtbx_crystal_models = []
-  #from IPython import embed; embed(); exit()
   if do_orientational_clustering:
     print ('IOTA: Starting orientational clustering')
     Dij_ori = {} # dictionary to store Dij for each cluster
@@ -257,7 +264,6 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
     from collections import Counter
     uc_cluster_count = Counter(list(CM.cluster_id_final))
     # instantiate the Dij_ori flat 1-d array
-    #from IPython import embed; embed();
     # Put all experiments list from same uc cluster together
     if True:
       from scitbx.matrix import sqr
@@ -279,7 +285,6 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
       Dij_ori[cluster] = flex.double([[0.0]*uc_cluster_count[cluster]]*uc_cluster_count[cluster])
     # Now populate the Dij_ori array
       N_samples_in_cluster = len(uc_experiments_list[cluster])
-      #from IPython import embed; embed();
       for i in range(N_samples_in_cluster-1):
         for j in range(i+1, N_samples_in_cluster):
           dij_ori = get_dij_ori(uc_experiments_list[cluster][i].crystals()[0],uc_experiments_list[cluster][j].crystals()[0])
@@ -291,10 +296,10 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
     from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding
     #plot_with_dimensional_embedding(1-Dij_ori[1]/flex.max(Dij_ori[1]), show_plot=True)
     for cluster in Dij_ori:
-      #import pdb; pdb.set_trace()
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85)
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       #from IPython import embed; embed()
+      #FIXME should be a PHIL param
       for i in range(n_cluster_ori):
         if len([zz for zz in CM.cluster_id_final if zz == i]) < 5:
           continue
