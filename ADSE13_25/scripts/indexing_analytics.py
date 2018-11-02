@@ -30,8 +30,8 @@ phil_scope = parse('''
             Assumes folder structure \
             Input Path    -----> out -----> debug folder \
                           -----> pickle and json files \
-                          -----> stdout
-            You can specificy multiple paths. In that case, the unit cells and RMSD info will be
+                          -----> stdout \
+            You can specificy multiple paths. In that case, the unit cells and RMSD info will be \
             only for the common set of images indexed
   num_nodes = 32
     .type = int
