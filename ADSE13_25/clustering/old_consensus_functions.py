@@ -214,7 +214,7 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
   NN = len(MM)
   from cctbx.uctbx.determine_unit_cell import NCDist_flatten
   Dij = NCDist_flatten(MM_double)
-  d_c = 6.13
+  d_c = flex.mean_and_variance(Dij.as_1d()).unweighted_sample_standard_deviation()#6.13
   #FIXME should be a PHIL param
   if len(cells) < 5:
     return [experiments_list[0].crystals()[0]], None
@@ -235,7 +235,7 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
     # Decision graph
     import matplotlib.pyplot as plt
     plt.plot(CM.rho, CM.delta, "r.", markersize=3.)
-    for x in xrange(NN):
+    for x in range(NN):
       if CM.cluster_id_maxima[x] >=0:
         plt.plot([CM.rho[x]], [CM.delta[x]], "ro")
     plt.show()
@@ -244,7 +244,7 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
     import matplotlib.pyplot as plt
     colors = [appcolors[i%10] for i in CM.cluster_id_full]
     plt.scatter(coord_x, coord_y, marker='o', color=colors, linewidth=0.4, edgecolor='k')
-    for i in xrange(n_cluster):
+    for i in range(n_cluster):
       item = flex.first_index(CM.cluster_id_maxima, i)
       plt.plot([cells[item].uc[0]], cells[item].uc[1], 'y.')
       plt.axes().set_aspect("equal")
@@ -292,10 +292,12 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
           Dij_ori[cluster][N_samples_in_cluster*j+i] = dij_ori
 
     # Now do the orientational cluster analysis
+    #from IPython import embed; embed(); exit()
     d_c_ori = 0.13
     from exafel_project.ADSE13_25.clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding
     #plot_with_dimensional_embedding(1-Dij_ori[1]/flex.max(Dij_ori[1]), show_plot=True)
     for cluster in Dij_ori:
+      d_c_ori=flex.mean_and_variance(Dij_ori[cluster].as_1d()).unweighted_sample_standard_deviation()
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85)
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       #from IPython import embed; embed()
@@ -316,17 +318,35 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
         stretch_plot_factor = 1.05 # (1+fraction of limits by which xlim,ylim should be set)
         import matplotlib.pyplot as plt
         plt.plot(CM_ori.rho, CM_ori.delta, "r.", markersize=3.)
-        for x in xrange(len(list(CM_ori.cluster_id_final))):
+        for x in range(len(list(CM_ori.cluster_id_final))):
           if CM_ori.cluster_id_maxima[x] >=0:
             plt.plot([CM_ori.rho[x]], [CM_ori.delta[x]], "ro")
         #from IPython import embed; embed(); exit()
         plt.xlim([-10,stretch_plot_factor*flex.max(CM_ori.rho)])
         plt.ylim([-10,stretch_plot_factor*flex.max(CM_ori.delta)])
         plt.show()
-  #from IPython import embed; embed(); exit()
-  # FIXME Still to be worked out what exactly should be returned
-  #if return_only_first_indexed_model:
-  #  return [experiments_list[0].crystals()[0]], None
+  # Make sure the crystal models are not too close to each other
+  # FIXME should be a PHIL
+  min_angle = 5.0 # taken from indexer.py
+  close_models_list = []
+  if len(dxtbx_crystal_models) > 1:
+    from dials.algorithms.indexing.compare_orientation_matrices import difference_rotation_matrix_axis_angle
+    for i_a in range(0,len(dxtbx_crystal_models)-1):
+      for i_b in range(i_a,len(dxtbx_crystal_models)):
+        cryst_a = dxtbx_crystal_models[i_a]
+        cryst_b = dxtbx_crystal_models[i_b]
+        R_ab, axis, angle, cb_op_ab = difference_rotation_matrix_axis_angle(cryst_a, cryst_b)
+      # FIXME
+        if abs(angle) < min_angle: # degrees
+          close_models_list.append((i_a, i_b))
+
+  # Now prune the dxtbx_crystal_models list
+  for close_models in close_models_list:
+    i_a,i_b = close_models
+    if dxtbx_crystal_models[i_a] is not None and dxtbx_crystal_models[i_b] is not None:
+      dxtbx_crystal_models[i_a] = None
+
+  dxtbx_crystal_models=[x for x in dxtbx_crystal_models if x is not None]
   if len(dxtbx_crystal_models) > 0:
     return dxtbx_crystal_models, None
   else:
