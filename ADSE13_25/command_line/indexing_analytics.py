@@ -265,8 +265,9 @@ def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
     with open(os.path.join(debug_root, filename)) as logfile:
       for line in logfile:
         try:
-          hostname, ts, now, status, step = line.split(',')
-        except ValueError:
+          if line == '\n': continue
+          hostname, ts, now, status, step = line.strip().split(',')
+        except ValueError as e:
           print (line); raise
         now_s, now_ms = reverse_timestamp(now)
         now = now_s + (1e-3 * now_ms)
