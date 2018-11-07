@@ -7,20 +7,20 @@ Please do pip install matplotlib_venn if you don't have it in your python instal
 '''
 
 from matplotlib import pyplot as plt
-import os
+import os,sys
 from libtbx.phil import parse
 from libtbx.utils import Sorry
-from .indexing_analytics import params_from_phil
-try:
-  from matplotlib_venn import venn3
-except ImportError as e:
-  raise Sorry(message)
+from exafel_project.ADSE13_25.command_line.indexing_analytics import params_from_phil
 
 venn_phil_scope = parse('''
   input_path = None
     .multiple = True
     .type = path
     .help = Path to folders whose indexing results are to be compared and plotted as Venn diagram \
+            Using cctbx.xfel gui convention, you can provide the path to XXX_rgYYYY \
+            Assumes following directory structure \
+            XXX_rgYYYY      \
+              -----> out     \
             Path can be relative to where the script is being run from or absolute paths
   show_plot = True
     .type = bool
@@ -45,26 +45,56 @@ def get_indexed_ts(roots):
       if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
       explist=ExperimentListFactory.from_json_file(os.path.join(root,filename))
       for exp in explist:
-        idx_filelist.append(exp.imageset.get_image_identifier(0).split('/')[-1])
+        exp_ts = exp.imageset.get_image_identifier(0).split('/')[-1].strip()
+        idx_filelist.append(exp_ts)
     cbf.append(set(idx_filelist))
   return cbf
 
-if __name__ == '__main__'
-  if '--help' in sys.argv[1:] or '--h' in sys.argv[1:]:
-    print (message)
-  params = params_from_phil(sys.argv[1:])
+
+def get_indexed_ts_from_cbf(roots):
+  ''' Function to get timestamps of images indexed in provided folders. Based on CBF filename '''
+  from dxtbx.model.experiment_list import ExperimentListFactory
+  cbf = []
+  for root in roots:
+    idx_filelist = []
+    for filename in os.listdir(root):
+      if os.path.splitext(filename)[1] != ".cbf": continue
+      idx_filelist.append(filename)
+    cbf.append(set(idx_filelist))
+  return cbf
+
+def plot_venn(params):
   roots = []
   tags = []
   for path in params.input_path:
-    roots.append(os.path.abspath(path))
+    roots.append(os.path.abspath(os.path.join(path, 'out')))
     tags.append(path.strip().split('/')[-1])
 
   results = get_indexed_ts(roots)
+  if len(results) == 2:
+    try:
+      from matplotlib_venn import venn2 as venn_plotter
+    except ImportError as e:
+      raise Sorry(message)
+  elif len(results) == 3:
+    try:
+      from matplotlib_venn import venn3 as venn_plotter
+    except ImportError as e:
+      raise Sorry(message)
+  else:
+    raise Sorry('matplotlib_venn does not currently support plotting anything other than 2 or 3 sets')
   fig_object = plt.figure()
-  venn3(results, set_labels = tags)
+  venn_plotter(results, set_labels = tags)
 
   if params.pickle_plot:
     from libtbx.easy_pickle import dump
     dump('%s'%params.pickle_filename, fig_object)
   if params.show_plot:
     plt.show()
+
+if __name__ == '__main__':
+  if '--help' in sys.argv[1:] or '--h' in sys.argv[1:]:
+    print (message)
+    exit()
+  params = params_from_phil(sys.argv[1:], phil_scope=venn_phil_scope)
+  plot_venn(params)

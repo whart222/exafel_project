@@ -1,4 +1,4 @@
-from __future__ import print_function, division
+from __future__ import absolute_import,print_function, division
 import sys, os, math
 from iotbx.detectors.cspad_detector_formats import reverse_timestamp
 from matplotlib import pyplot as plt
@@ -68,7 +68,7 @@ phil_scope = parse('''
             If this and out_logfile is supplied, this takes precedence
 ''')
 
-def params_from_phil(args):
+def params_from_phil(args, phil_scope=phil_scope):
   user_phil = []
   for arg in args:
     if os.path.isfile(arg):
