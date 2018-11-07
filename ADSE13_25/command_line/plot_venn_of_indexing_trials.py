@@ -1,7 +1,8 @@
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+
 message = '''
 Plots venn diagram of indexing results from multiple folders
-This module requires a module called matplotlib_venn. 
+This module requires a module called matplotlib_venn.
 Please do pip install matplotlib_venn if you don't have it in your python installation
 '''
 
@@ -31,7 +32,7 @@ venn_phil_scope = parse('''
   pickle_filename = venn_plot.pickle
     .type = str
     .help = Default name of pickled matplotlib plot saved to disk
-''') 
+''')
 
 
 def get_indexed_ts(roots):
@@ -65,5 +66,5 @@ if __name__ == '__main__'
   if params.pickle_plot:
     from libtbx.easy_pickle import dump
     dump('%s'%params.pickle_filename, fig_object)
-  if params.show_plot: 
+  if params.show_plot:
     plt.show()
