@@ -15,7 +15,7 @@ message = ''' script to get a sense of the computational performance of every ra
 phil_scope = parse('''
   input_path = .
     .type = str
-    .help = path to where the debug txt files are located
+    .help = path to where the processing results are. For example path to XXX_rgYYYY
   num_nodes = 100
     .type = int
     .help = Number of nodes used to do data processing. Used in timing information
@@ -53,7 +53,7 @@ def params_from_phil(args):
 def run(params):
   counter = 0
   reference = None
-  root=params.input_path
+  root=os.path.join(params.input_path, 'out', 'debug')
   fig_object = plt.figure()
   for filename in os.listdir(root):
     if os.path.splitext(filename)[1] != '.txt': continue
