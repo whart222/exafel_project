@@ -26,6 +26,12 @@ rmsd_phil_scope = parse('''
   mpi = False
     .type = bool
     .help = Enables usage of mpi part of code
+  mpi_rank_frac = 1.0
+    .type = double
+    .help = fraction of num_images that each MPI rank should send to rank 0 after sorting its pile.\
+            This number can be made < 1 if you are \
+            confident that each rank gets roughly an equal proportion of high rmsd images \ 
+            Will help processing speeds and memory issues
   dump_files = True
     .type = bool
     .help = Dump json and pickle files of the highest RMSD frames.
@@ -139,7 +145,8 @@ if __name__ == '__main__':
       num_images = params.num_images
     else:
       num_images = len(iterable2)
-    results = find_rmsd_from_files(iterable2, root, num_images, rank=rank)
+    mpi_rank_num_images = int(params.mpi_rank_frac*num_images) 
+    results = find_rmsd_from_files(iterable2, root, mpi_rank_num_images, rank=rank)
     results = comm.gather(results, root=0)
     comm.barrier()
     if rank == 0:
