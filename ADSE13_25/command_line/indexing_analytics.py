@@ -95,7 +95,7 @@ def add_step(step, duration):
   steps_d[step].append(duration)
 
 
-def run(params, root, common_set=None):
+def run(params, root, common_set=None, comm=None):
   iterable = []
   iterable2 = []
   debug_root = os.path.join(root, 'debug')
@@ -107,13 +107,8 @@ def run(params, root, common_set=None):
     if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
     iterable2.append(filename)
   print ('done appending')
-  #if command_line.options.mpi:
-  if params.mpi:
-    try:
-      from mpi4py import MPI
-    except ImportError:
-      raise Sorry("MPI not found")
-    comm = MPI.COMM_WORLD
+  #if mpi is present:
+  if comm is not None:
     rank = comm.Get_rank()
     size = comm.Get_size()
     print (rank, size)
@@ -349,7 +344,7 @@ def get_hits_and_indexing_stats(filenames, debug_root,rank=0):
   return (len(hits), len(idx_successful_time), sum(idx_attempt_time)/3600.0, sum(idx_successful_time)/3600.0, idx_cutoff_time_exceeded_event, num_of_xray_events, num_of_images_analyzed)
 
 # Extract timing information from log file
-def get_uc_and_rmsd_stats(filenames, root, rank=0, common_set=None):
+def get_uc_and_rmsd_stats(filenames, root, rank=0, common_set=None, comm=None):
   print ('Getting unit cell information')
   # Unit cell and RMSD statistics for that run
   all_uc_a = flex.double()
@@ -368,7 +363,7 @@ def get_uc_and_rmsd_stats(filenames, root, rank=0, common_set=None):
     print ('Using %d common set images to report unit cell and RMSD statistics'%(len(common_set)))
   for filename in filenames:
     fjson=os.path.join(root, filename)
-    experiments = ExperimentListFactory.from_json_file(fjson)
+    experiments = ExperimentListFactory.from_json_file(fjson, check_format=False)
     expt_id_common = []
     for ii,crystal in enumerate(experiments.crystals()):
       if common_set is not None:
@@ -391,21 +386,38 @@ def get_uc_and_rmsd_stats(filenames, root, rank=0, common_set=None):
       dR.append((col(refl['xyzcal.mm']) - col(refl['xyzobs.mm.value'])).length())
   return all_uc_a, all_uc_b, all_uc_c, all_uc_alpha, all_uc_beta, all_uc_gamma, dR
 
-def get_common_set(roots):
+def get_common_set(roots, comm=None):
   ''' Function to get common set of images indexed in multiple folders. Based on CBF filenames '''
   from dxtbx.model.experiment_list import ExperimentListFactory
+  if comm is not None:
+    rank = comm.Get_rank()
+    size = comm.Get_size()
   cbf = {}
-  for root in roots:
+  for ii,root in enumerate(roots):
+    if comm is not None:
+      if (ii+rank)%size != 0: continue
     cbf[root] = []
     for filename in os.listdir(root):
       if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
-      explist=ExperimentListFactory.from_json_file(os.path.join(root,filename))
+      explist=ExperimentListFactory.from_json_file(os.path.join(root,filename), check_format=False)
       for exp in explist:
         cbf[root].append(exp.imageset.get_image_identifier(0).split('/')[-1])
+  if comm is not None:
+    comm.barrier()
+    gather_cbf = comm.gather(cbf, root=0)
+    if rank !=0: return
+    combo_cbf = {}
+    for elem in gather_cbf:
+      for key in elem:
+        if key not in combo_cbf:
+          combo_cbf[key] = []
+        combo_cbf[key].extend(elem[key])
+  else:
+    combo_cbf = cbf
   # Now take intersection
-  common_set = set(cbf[roots[0]])
+  common_set = set(combo_cbf[roots[0]])
   for ii in range(1, len(roots)):
-    common_set = common_set.intersection(set(cbf[roots[ii]]))
+    common_set = common_set.intersection(set(combo_cbf[roots[ii]]))
 
   return list(common_set)
 
@@ -430,7 +442,16 @@ if __name__ == '__main__':
   show_plot = params.show_plot
   indexing_time_cutoff = params.indexing_time_cutoff
   common_set=None
+  comm=None
+  if params.mpi:
+    try:
+      from mpi4py import MPI
+    except ImportError:
+      raise Sorry("MPI not found")
+    comm = MPI.COMM_WORLD
   if len(roots) > 1:
-    common_set = get_common_set(roots)
+    common_set = get_common_set(roots, comm=comm)
+    if comm is not None:
+      comm.barrier()
   for root in roots:
-    run(params, root, common_set=common_set)
+    run(params, root, common_set=common_set, comm=comm)
