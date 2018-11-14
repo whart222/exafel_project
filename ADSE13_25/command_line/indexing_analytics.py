@@ -66,6 +66,9 @@ phil_scope = parse('''
     .type = float
     .help = wall time in seconds taken for job to finish. This can be used in lieu of out_logfile option for getting timing option \
             If this and out_logfile is supplied, this takes precedence
+  ts_from_cbf = False
+    .type = bool
+    .help = If true, gets timestamps indexed from name of cbf files. Much faster than reading in json files one by one
 ''')
 
 def params_from_phil(args, phil_scope=phil_scope):
@@ -391,17 +394,23 @@ def get_uc_and_rmsd_stats(filenames, root, rank=0, common_set=None):
       dR.append((col(refl['xyzcal.mm']) - col(refl['xyzobs.mm.value'])).length())
   return all_uc_a, all_uc_b, all_uc_c, all_uc_alpha, all_uc_beta, all_uc_gamma, dR
 
-def get_common_set(roots):
-  ''' Function to get common set of images indexed in multiple folders. Based on CBF filenames '''
+def get_common_set(roots, ts_from_cbf=False):
+  ''' Function to get common set of images indexed in multiple folders. Based on CBF filenames 
+      ts_from_cbf if True is much faster than reading from json files'''
   from dxtbx.model.experiment_list import ExperimentListFactory
   cbf = {}
   for root in roots:
     cbf[root] = []
-    for filename in os.listdir(root):
-      if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
-      explist=ExperimentListFactory.from_json_file(os.path.join(root,filename), check_format=False)
-      for exp in explist:
-        cbf[root].append(exp.imageset.get_image_identifier(0).split('/')[-1])
+    if ts_from_cbf:
+      for filename in os.listdir(root):
+        if os.path.splitext(filename)[1] != ".cbf": continue
+        cbf[root].append(filename)
+    else:
+      for filename in os.listdir(root):
+        if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
+        explist=ExperimentListFactory.from_json_file(os.path.join(root,filename), check_format=False)
+        for exp in explist:
+          cbf[root].append(exp.imageset.get_image_identifier(0).split('/')[-1])
   # Now take intersection
   common_set = set(cbf[roots[0]])
   for ii in range(1, len(roots)):
@@ -431,6 +440,6 @@ if __name__ == '__main__':
   indexing_time_cutoff = params.indexing_time_cutoff
   common_set=None
   if len(roots) > 1:
-    common_set = get_common_set(roots)
+    common_set = get_common_set(roots, ts_from_cbf=params.ts_from_cbf)
   for root in roots:
     run(params, root, common_set=common_set)
