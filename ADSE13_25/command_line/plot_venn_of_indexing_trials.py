@@ -32,6 +32,10 @@ venn_phil_scope = parse('''
   pickle_filename = venn_plot.pickle
     .type = str
     .help = Default name of pickled matplotlib plot saved to disk
+  ts_from_cbf = True
+    .type = bool
+    .help = If true, gets timestamps from cbf filenames. Otherwise gets it from the json files by opening each of them\
+            Much faster if you get it just from cbf filenames
 ''')
 
 
@@ -43,7 +47,7 @@ def get_indexed_ts(roots):
     idx_filelist = []
     for filename in os.listdir(root):
       if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
-      explist=ExperimentListFactory.from_json_file(os.path.join(root,filename))
+      explist=ExperimentListFactory.from_json_file(os.path.join(root,filename), check_format=False)
       for exp in explist:
         exp_ts = exp.imageset.get_image_identifier(0).split('/')[-1].strip()
         idx_filelist.append(exp_ts)
@@ -56,6 +60,7 @@ def get_indexed_ts_from_cbf(roots):
   from dxtbx.model.experiment_list import ExperimentListFactory
   cbf = []
   for root in roots:
+    print (root)
     idx_filelist = []
     for filename in os.listdir(root):
       if os.path.splitext(filename)[1] != ".cbf": continue
@@ -70,7 +75,11 @@ def plot_venn(params):
     roots.append(os.path.abspath(os.path.join(path, 'out')))
     tags.append(path.strip().split('/')[-1])
 
-  results = get_indexed_ts(roots)
+  if params.ts_from_cbf:
+    results = get_indexed_ts_from_cbf(roots)
+  else:
+    results = get_indexed_ts(roots)
+  print ('DONE WITH TIMESAMPS')
   if len(results) == 2:
     try:
       from matplotlib_venn import venn2 as venn_plotter
@@ -83,9 +92,10 @@ def plot_venn(params):
       raise Sorry(message)
   else:
     raise Sorry('matplotlib_venn does not currently support plotting anything other than 2 or 3 sets')
+  print ('NOW PLOTTING')
   fig_object = plt.figure()
   venn_plotter(results, set_labels = tags)
-
+  print ('DONE PLOTTING')
   if params.pickle_plot:
     from libtbx.easy_pickle import dump
     dump('%s'%params.pickle_filename, fig_object)

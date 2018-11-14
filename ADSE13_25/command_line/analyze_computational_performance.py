@@ -28,6 +28,9 @@ phil_scope = parse('''
   plot_title = Computational weather plot
     .type = str
     .help = title of the computational weather plot
+  show_plot = True
+    .type = bool
+    .help = flag to indicate if plot should be displayed on screen
   pickle_plot = False
     .type = bool
     .help = If True, will pickle matplotlib session so that it can be opened later for analysis/viewing \
@@ -87,7 +90,8 @@ def run(params):
   if params.pickle_plot:
     from libtbx.easy_pickle import dump
     dump('%s'%params.pickle_filename, fig_object)
-  plt.show()
+  if params.show_plot:
+    plt.show()
 
 if __name__ == '__main__':
   if '--help' in sys.argv[1:] or '-h' in sys.argv[1:]:
