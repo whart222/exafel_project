@@ -28,7 +28,7 @@ iota {
             off : No IOTA processing is done. \
             random-sub-sampling : randomly sub-sample observed bragg spots and index. Can be done multiple times. See options for random-sub-sampling if this is used.
   random_sub_sampling {
-    ntrials = 10
+    ntrials = 50
       .type = int
       .help = Number of random sub-samples to be selected
     fraction_sub_sample = 0.8
@@ -301,6 +301,7 @@ class Processor_iota(Processor):
           from scitbx.array_family import flex
           len_max_indexed = -999
           experiments_list = []
+          self.known_crystal_models=None
           # Add an id for each strong spot observed in the image
           observed['spot_id'] = flex.size_t(range(len(observed)))
           # No outlier rejection or refinement should be done for the candidate basis vectors
@@ -333,8 +334,12 @@ class Processor_iota(Processor):
           #experiments_list = load('experiments_list.pickle')
           #observed_samples_list = load('observed_samples_list.pickle')
           if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
-            from exafel_project.ADSE13_25.clustering.consensus_functions import get_uc_consensus as get_consensus
-            known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering)
+            if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
+              from exafel_project.ADSE13_25.clustering.old_consensus_functions import get_uc_consensus as get_consensus
+              known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=False, return_only_first_indexed_model=False, finalize_method=None, clustering_params=None)
+            else:
+              from exafel_project.ADSE13_25.clustering.consensus_functions import get_uc_consensus as get_consensus
+              known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering)
          # from IPython import embed; embed(); exit()
           print ('IOTA: Finalizing consensus')
           if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
