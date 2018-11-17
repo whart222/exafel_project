@@ -1,7 +1,9 @@
 from __future__ import absolute_import, print_function, division
 
 message = ''' Script to plot residual vectors given pairs of experiment json and reflection pickle files.
-Uses certain components of dials_refinement_preceding_integration.py in cctbx_project/rstbx'''
+Uses certain components of dials_refinement_preceding_integration.py in cctbx_project/rstbx
+Most simple usage: Run it in a folder with refined_experiments.json and indexed.pickle files
+'''
 
 import os,sys,math
 from libtbx.phil import parse
@@ -77,7 +79,7 @@ def plot_residual_vectors(experiment_list_files, reflection_table_files, params)
           #plt.plot([refl_now['xyzcal.px'][match["pred"]][1]],[-refl_now['xyzcal.px'][match["pred"]][0]],"g.", markersize=20)
           #plt.plot([PX[match["spot"]][1], PX[match["spot"]][1] + 10.*cv[1]],
           #       [-PX[match["spot"]][0], -PX[match["spot"]][0] - 10.*cv[0]],'r-', linewidth=1, solid_capstyle="butt")
-          plt.arrow(PX[match["spot"]][1], -PX[match["spot"]][0], 10.*cv[1], -10.*cv[0], width=0.5)
+          plt.arrow(PX[match["spot"]][1], -PX[match["spot"]][0], 20.*cv[1], -20.*cv[0], width=0.5)
         if True:
           # Uses the calculated spot position
           from rstbx.apps.stills.util import residual_map_special_deltapsi_add_on
@@ -87,7 +89,8 @@ def plot_residual_vectors(experiment_list_files, reflection_table_files, params)
             reflections = refl_now,
             matches = indexed_pairs_provisional, experiments=temp_expt_list,
             hkllist = hkllist,
-            predicted = refl_now['xyzcal.mm'], plot=plt, eta_deg=FWMOSAICITY, deff=DOMAIN_SZ_ANG
+            predicted = refl_now['xyzcal.mm'], plot=plt, eta_deg=FWMOSAICITY, deff=DOMAIN_SZ_ANG, 
+            markersize=20
             )
         plt.xlim([0,expt.detector[0].get_image_size()[1]])
         plt.ylim([-expt.detector[0].get_image_size()[0],0])
