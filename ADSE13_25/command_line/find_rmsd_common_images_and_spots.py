@@ -99,7 +99,7 @@ def get_rmsd_stats(filenames,root, rank=0,common_set=None):
         dR.append((col(entry['xyzcal.mm']) - col(entry['xyzobs.mm.value'])).length())
   return dR
 
-def run(params, root, common_set=None):
+def run(params, root, common_set=None,comm=None):
   iterable2 = []
   for filename in os.listdir(root):
     if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
@@ -109,7 +109,6 @@ def run(params, root, common_set=None):
       from mpi4py import MPI
     except ImportError:
       raise Sorry("MPI not found")
-    comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
     print (rank, size)
@@ -136,7 +135,22 @@ if __name__=='__main__':
   for input_path in params.input_path:
     roots.append(os.path.join(input_path, 'out'))
   common_set=None
+  comm=None
+  rank=0
+  if params.mpi:
+    try:
+      from mpi4py import MPI
+    except ImportError:
+      raise Sorry("MPI not found")
+    comm=MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    print (rank, size)
   if len(roots) > 1:
-    common_set = get_common_set(roots)
+    if rank == 0:
+      common_set = get_common_set(roots)
+  if params.mpi:
+    comm.barrier()
+    common_set=comm.bcast(common_set, root=0)
   for root in roots:
-    run(params,root, common_set=common_set)
+    run(params,root, common_set=common_set,comm=comm)
