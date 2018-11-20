@@ -20,6 +20,9 @@ rmsd_phil_scope = parse('''
                           -----> stdout \
             You can specificy multiple paths. In that case, the unit cells and RMSD info will be \
             only for the common set of images indexed
+  mpi = False
+    .type = bool
+    .help = If True, mpi can be used for running the program
 ''')
 
 def get_common_set(roots):
@@ -67,7 +70,7 @@ def get_common_set(roots):
     common_image_and_spot_set[ts] = list(common_image_and_spot_set[ts])
   return common_image_and_spot_set
 
-def get_rmsd_stats(root, common_set=None):
+def get_rmsd_stats(filenames,root, rank=0,common_set=None):
   ''' Provide a folder with refined_experiment.json and indexed pickle files. It will calculate the RMSD'''
 
   from dxtbx.model.experiment_list import ExperimentListFactory
@@ -78,8 +81,7 @@ def get_rmsd_stats(root, common_set=None):
   dR = flex.double()
   if common_set is not None:
     print ('Using %d common set images to report RMSD statistics'%(len(common_set)))
-  for filename in os.listdir(root):
-    if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
+  for filename in filenames:
     fjson=os.path.join(root, filename)
     experiments = ExperimentListFactory.from_json_file(fjson, check_format=False)
     fpickle = os.path.join(root, filename.split('refined_experiments')[0]+'indexed.pickle')
@@ -95,6 +97,35 @@ def get_rmsd_stats(root, common_set=None):
         if common_set is not None:
           if entry['xyzobs.mm.value'] not in common_set[cbf_now]: continue
         dR.append((col(entry['xyzcal.mm']) - col(entry['xyzobs.mm.value'])).length())
+  return dR
+
+def run(params, root, common_set=None):
+  iterable2 = []
+  for filename in os.listdir(root):
+    if 'refined_experiments' not in os.path.splitext(filename)[0] or os.path.splitext(filename)[1] != ".json": continue
+    iterable2.append(filename)
+  if params.mpi:
+    try:
+      from mpi4py import MPI
+    except ImportError:
+      raise Sorry("MPI not found")
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    print (rank, size)
+    # get rmsd info
+    iterable2 = [iterable2[i] for i in range(len(iterable2)) if (i+rank)%size == 0]
+    results2 = get_rmsd_stats(iterable2, root,rank=rank,common_set=common_set)
+    results2 = comm.gather(results2, root=0)
+    if rank != 0: return
+  else:
+    results2 = [get_rmsd_stats(iterable2, root, rank=0, common_set=common_set)]
+
+  dR = flex.double()
+  info_list = []
+  info = []
+  for ii,r in enumerate(results2):
+    dR.extend(r)
   print ('Total RMSD i.e calc - obs for Bragg spots (um) = ', 1000.0*math.sqrt(dR.dot(dR)/len(dR)))
 
 if __name__=='__main__':
@@ -108,4 +139,4 @@ if __name__=='__main__':
   if len(roots) > 1:
     common_set = get_common_set(roots)
   for root in roots:
-    get_rmsd_stats(root, common_set=common_set)
+    run(params,root, common_set=common_set)
