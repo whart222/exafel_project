@@ -6,7 +6,7 @@
 # Run `docker build .` and wait for the image to build (may take some time)
 
 FROM centos:centos7
-MAINTAINER Lee O'Riordan <loriordan@lbl.gov>
+MAINTAINER Asmit Bhowmick <abhowmick@lbl.gov>
 
 RUN yum clean all &&  yum -y install bzip2.x86_64 libgomp.x86_64 telnet.x86_64 gcc-c++ gcc-gfortran && yum groupinstall "Development Tools" -y
 
@@ -18,7 +18,7 @@ ENV PATH /opt/conda/bin:$PATH
 ENV LD_LIBRARY_PATH /opt/conda/lib:$LD_LIBRARY_PATH
 
 # psana-conda
-RUN conda update -y conda && conda install -y --channel lcls-rhel7 psana-conda && conda install -y future ipython reportlab h5py mpich2 wxpython pillow libtiff mock pytest jinja2 scikit-learn tabulate pytables scons mysql-python && conda install -y --channel conda-forge orderedset && python -m pip install procrunner && rm -rf /opt/conda/lib/python2.7/site-packages/numexpr-2.6.2-py2.7.egg-info
+RUN conda update -y conda && conda install -y --channel lcls-rhel7 psana-conda && conda install -y future ipython reportlab h5py mpich2 wxpython pillow libtiff mock pytest jinja2 scikit-learn tabulate tqdm pytables scons mysql-python && conda install -y --channel conda-forge orderedset && python -m pip install procrunner && rm -rf /opt/conda/lib/python2.7/site-packages/numexpr-2.6.2-py2.7.egg-info
 
 # recreate /reg/d directories for data
 RUN mkdir -p /reg/g &&\
