@@ -21,10 +21,14 @@ from dxtbx.datablock import DataBlockFactory
 from scitbx.array_family import flex
 import numpy as np
 from libtbx import easy_pickle
+import time
 
 # phil string imports
 iota_phil_str = '''
   iota {
+    timeout_cutoff_sec = None
+      .type = float
+      .help = Timeout cutoff to end iota loop (seconds)
     method = off *random_sub_sampling
       .type = choice
       .help = Type of IOTA processing to be done. \
@@ -64,6 +68,12 @@ from xfel.command_line.xfel_process import Script as DialsProcessScript
 from xfel.ui.db.frame_logging import DialsProcessorWithLogging
 from xfel.command_line.xtc_process import EventOffsetSerializer, InMemScript
 
+
+class IOTA_TimeoutError(Exception):
+  """Raises a timeout error if IOTA indexing takes too long """
+  pass
+
+
 class InMemScript_iota(InMemScript):
 
   def index(self, datablock, observed):
@@ -80,7 +90,13 @@ class InMemScript_iota(InMemScript):
         self.params.indexing.stills.candidate_outlier_rejection=False
         self.params.indexing.stills.refine_all_candidates=False
 
+      # Adding timeout option for IOTA
+      initial_time = time.time()
       for trial in range(self.params.iota.random_sub_sampling.ntrials):
+        curr_time = time.time()
+        if self.params.iota.timeout_cutoff_sec is not None:
+          if curr_time - initial_time > self.params.iota.timeout_cutoff_sec:
+            raise IOTA_TimeoutError('IOTA_TIMEOUT ',curr_time-initial_time)
         flex.set_random_seed(trial+1001)
         observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
         try:
