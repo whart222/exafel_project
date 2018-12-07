@@ -1,7 +1,6 @@
 #!/bin/bash
 
 source /cctbx/build/setpaths.sh
-ts="2015-07-26T12:43Z45.065"
 
 RUN=$1
 TRIAL=$2
@@ -19,22 +18,24 @@ START_XTC=$(date +"%s")
 
 # mask and metrology files are from the current dir
 IN_DIR=${BASE_PATH}/input
-#DATA_DIR=${BASE_PATH}/../small_xtc2/${EXP}
-DATA_DIR=/global/cscratch1/sd/asmit/iota_demo/small_xtc2/${EXP}
+OUT_DIR=${DW_JOB_STRIPED}/out
+DATA_DIR=$DW_JOB_STRIPED # When xtc2 streams are staged to Burst Buffer
 
 export PS_CALIB_DIR=$IN_DIR
-export PS_SMD_N_EVENTS=1
-export PS_SMD_NODES=10
+export PS_SMD_N_EVENTS=1000 #1
+export PS_SMD_NODES=32 # 10
 
-cctbx_args="input.experiment=${EXP} input.run_num=${RUN} output.logging_dir=None output.output_dir=${BASE_PATH}/${RUN_DIR}/${TRIAL_RG}/out format.cbf.invalid_pixel_mask=${IN_DIR}/mask.pickle ${BASE_PATH}/${RUN_DIR}/${TRIAL_RG}/params_1.phil dump_indexed=True input.xtc_dir=${DATA_DIR} "
+# Best set of params 
+cctbx_args="input.experiment=${EXP} input.run_num=${RUN} output.logging_dir=DevNull output.output_dir=${OUT_DIR} format.cbf.invalid_pixel_mask=/tmp/mask.pickle /tmp/params_1.phil input.xtc_dir=${DATA_DIR} input.reference_geometry=/tmp/cspad_refined_1.json"
+
+
+##### PLEASE NOTE #####
+# ONLY PRODUCTION MODE IS SUPPORTED i.e THE LAST OPTION; PLEASE BE SURE TO USE THE RIGHT PATH TO THESE SCRIPTS
+# IF USING OTHER MODES
 
 if [ "${CMDMODE}" = "debug_timestamp" ]; then
   cctbx_args="$cctbx_args debug.event_timestamp=${ts}"
 fi
-
-#echo ${cctbx_args}
-#exit
-
 
 if [ "$LIMIT" -ne 0 ]; then
     cctbx_args="$cctbx_args max_events=${LIMIT}"
@@ -42,7 +43,7 @@ fi
 
 if [ "${CMDMODE}" = "pythonprof" ]; then
     libtbx.python -m cProfile -s tottime libtbx.python /cctbx/modules/exafel_project/ADSE13_25/xtc_process_iota_srs.py ${cctbx_args}
-
+  
 elif [ "${CMDMODE}" = "strace" ]; then
     strace -ttt -f -o $$.log libtbx.python /cctbx/modules/exafel_project/ADSE13_25/xtc_process_iota_srs.py ${cctbx_args}
 
@@ -53,12 +54,11 @@ elif [ "${CMDMODE}" = "debug" ]; then
 elif [ "${CMDMODE}" = "debug_timestamp" ]; then
     #python ${PWD}/xtc_process_iota_srs_ps2.py ${cctbx_args}
     libtbx.python ${PWD}/xtc_process.py ${cctbx_args}
-
+  
 else
     echo "Running in production mode"
-    #libtbx.python /cctbx/modules/exafel_project/ADSE13_25/xtc_process_iota_srs.py ${cctbx_args}
-    #libtbx.python /cctbx/modules/cctbx_project/xfel/command_line/xtc_process.py ${cctbx_args}
-    cctbx.xfel.xtc_process ${cctbx_args}
+    libtbx.python /tmp/xtc_process.py ${cctbx_args}
+    #cctbx.xfel.xtc_process ${cctbx_args}
 fi
 
 END_XTC=$(date +"%s")
