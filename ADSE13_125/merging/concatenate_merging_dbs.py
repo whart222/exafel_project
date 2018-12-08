@@ -1,3 +1,4 @@
+from __future__ import print_function, division, absolute_import
 from libtbx.phil import parse
 import sys, os, shutil
 from six.moves import StringIO
@@ -20,7 +21,7 @@ def get_last_line(filename):
       first = f.readline()        # Read the first line.
       f.seek(-2, os.SEEK_END)     # Jump to the second last byte.
       while f.read(1) != b"\n":   # Until EOL is found...
-	  f.seek(-2, os.SEEK_CUR) # ...jump back the read byte plus one more.
+          f.seek(-2, os.SEEK_CUR) # ...jump back the read byte plus one more.
       last = f.readline()         # Read last line.
   return last
 
@@ -30,7 +31,7 @@ def run(args):
     try:
       user_phil.append(parse(arg))
     except Exception, e:
-      print "Couldn't parse argument %s"%arg
+      print ("Couldn't parse argument %s"%arg)
       return
 
   scope = phil_scope.fetch(sources = user_phil)
@@ -56,9 +57,9 @@ def run(args):
       shutil.copy(source_miller_db_filename, dest_miller_db_filename)
       shutil.copy(source_frames_db_filename, dest_frames_db_filename)
       shutil.copy(source_observation_db_filename, dest_observation_db_filename)
-      print "Copying %s to %s"%(src_tag, params.dest_tag)
+      print ("Copying %s to %s"%(src_tag, params.dest_tag))
       continue
-    print "Appending %s to %s"%(src_tag, params.dest_tag)
+    print ("Appending %s to %s"%(src_tag, params.dest_tag))
 
     for line1, line2 in zip(open(source_miller_db_filename).readlines(), open(dest_miller_db_filename).readlines()):
       assert line1 == line2
@@ -69,9 +70,9 @@ def run(args):
     buf = StringIO()
     with open(source_frames_db_filename) as source_file:
       for line in source_file:
-	data = line.strip().split()
-	new_frame_id = str(int(data[0]) + n_dest_frames)
-	buf.write(" ".join([new_frame_id] + data[1:]) + "\n")
+        data = line.strip().split()
+        new_frame_id = str(int(data[0]) + n_dest_frames)
+        buf.write(" ".join([new_frame_id] + data[1:]) + "\n")
     with open(dest_frames_db_filename, 'a') as dest_file:
       buf.seek (0)
       shutil.copyfileobj (buf, dest_file)
@@ -79,15 +80,15 @@ def run(args):
     buf = StringIO()
     with open(source_observation_db_filename) as source_file:
       for line in source_file:
-	data = line.strip().split()
-	new_frame_id = str(int(data[5]) + n_dest_frames)
-	data[5] = new_frame_id
-	buf.write(" ".join(data) + "\n")
+        data = line.strip().split()
+        new_frame_id = str(int(data[5]) + n_dest_frames)
+        data[5] = new_frame_id
+        buf.write(" ".join(data) + "\n")
     with open(dest_observation_db_filename, 'a') as dest_file:
       buf.seek (0)
       shutil.copyfileobj (buf, dest_file)
 
-  print "Did it with style"
+  print ("Did it with style")
 
 if __name__ == "__main__":
   run(sys.argv[1:])
