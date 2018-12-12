@@ -18,15 +18,10 @@ def run(mtz1, mtz2):
   ma_anom_diff_2 = miller_arrays_2[0].anomalous_differences()
   ma_anom_diff_1.show_summary()
   ma_anom_diff_2.show_summary()
+  ma_anom_diff_1_cs = ma_anom_diff_1.common_set(ma_anom_diff_2)
+  ma_anom_diff_2_cs = ma_anom_diff_2.common_set(ma_anom_diff_1)
   # Make sure the 2 arrays have the same size
-  if ma_anom_diff_1.size() == ma_anom_diff_2.size():
-    cc_anom = flex.linear_correlation(ma_anom_diff_1.data(), ma_anom_diff_2.data()).coefficient()
-  elif ma_anom_diff_1.size() > ma_anom_diff_2.size():
-    ma_anom_diff_1_cs = ma_anom_diff_1.common_set(ma_anom_diff_2)
-    cc_anom = flex.linear_correlation(ma_anom_diff_1_cs.data(), ma_anom_diff_2.data()).coefficient()
-  else:
-    ma_anom_diff_2_cs = ma_anom_diff_2.common_set(ma_anom_diff_1)
-    cc_anom = flex.linear_correlation(ma_anom_diff_1.data(), ma_anom_diff_2_cs.data()).coefficient()
+  cc_anom = flex.linear_correlation(ma_anom_diff_1_cs.data(), ma_anom_diff_2_cs.data()).coefficient()
   print ('Value of CC_anom for the dataset is = ',cc_anom)
   #from IPython import embed; embed(); exit()
 
