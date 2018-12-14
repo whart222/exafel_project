@@ -303,7 +303,7 @@ def get_uc_consensus(experiments_list, show_plot=False, return_only_first_indexe
       #from IPython import embed; embed()
       #FIXME should be a PHIL param
       for i in range(n_cluster_ori):
-        if len([zz for zz in CM.cluster_id_final if zz == i]) < 5:
+        if len([zz for zz in CM_ori.cluster_id_final if zz == i]) < 5:
           continue
         item = flex.first_index(CM_ori.cluster_id_maxima, i)
         dxtbx_crystal_model = uc_experiments_list[cluster][item].crystals()[0]
