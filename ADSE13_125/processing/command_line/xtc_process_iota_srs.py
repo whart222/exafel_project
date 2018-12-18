@@ -106,6 +106,7 @@ class InMemScript_iota(InMemScript):
         except Exception as e:
           print('Indexing failed for some reason')
       if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
+        #from IPython import embed; embed(); exit()
         from exafel_project.ADSE13_25.clustering.old_consensus_functions import get_uc_consensus as get_consensus
           #known_crystal_models = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model = False)
         if len(experiments_list) > 0:
@@ -116,7 +117,7 @@ class InMemScript_iota(InMemScript):
         self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
         self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
     #
-      experiments, indexed = self.index_with_iota(datablock, observed)
+      experiments, indexed = self.index_with_known_orientation(datablock, observed)
       return experiments,indexed
     else:
       experiments, indexed = self.index_with_iota(datablock, observed)
@@ -132,6 +133,65 @@ class InMemScript_iota(InMemScript):
                      two_theta_low = self.tt_low, two_theta_high = self.tt_high,
                      db_event = self.db_event)
     return experiments, indexed
+
+  def index_with_known_orientation(self, datablock, reflections):
+    ''' Copy of the index function from stills_process to force IOTA to use stills_indexer during known_orientation '''
+    from dials.algorithms.indexing.stills_indexer import stills_indexer
+    from time import time
+    import copy
+    st = time()
+
+    imagesets = datablock.extract_imagesets()
+
+    params = copy.deepcopy(self.params)
+    # don't do scan-varying refinement during indexing
+    params.refinement.parameterisation.scan_varying = False
+
+    if hasattr(self, 'known_crystal_models'):
+      known_crystal_models = self.known_crystal_models
+    else:
+      known_crystal_models = None
+    if params.indexing.stills.method_list is None:
+      idxr = stills_indexer.from_parameters(
+        reflections, imagesets, known_crystal_models=known_crystal_models,
+        params=params)
+      idxr.index()
+    else:
+      indexing_error = None
+      for method in params.indexing.stills.method_list:
+        params.indexing.method = method
+        try:
+          idxr = stills_indexer.from_parameters(
+            reflections, imagesets,
+            params=params)
+          idxr.index()
+        except Exception as e:
+          logger.info("Couldn't index using method %s"%method)
+          if indexing_error is None:
+            if e is None:
+              e = Exception("Couldn't index using method %s"%method)
+            indexing_error = e
+        else:
+          indexing_error = None
+          break
+      if indexing_error is not None:
+        raise indexing_error
+
+    indexed = idxr.refined_reflections
+    experiments = idxr.refined_experiments
+
+    if known_crystal_models is not None:
+      from dials.array_family import flex
+      filtered = flex.reflection_table()
+      for idx in set(indexed['miller_index']):
+        sel = indexed['miller_index'] == idx
+        if sel.count(True) == 1:
+          filtered.extend(indexed.select(sel))
+      print("Filtered duplicate reflections, %d out of %d remaining"%(len(filtered),len(indexed)))
+      indexed = filtered
+
+    return experiments, indexed
+
 
 if __name__ == "__main__":
   # Fix to make init method work for InMemScript_iota
