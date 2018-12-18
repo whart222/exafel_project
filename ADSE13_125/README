@@ -47,4 +47,22 @@ Contact: Asmit Bhowmick <abhowmick@lbl.gov>
      o wall_time ==> time in seconds it took for the processing job in (6) to finish 
      o num_nodes ==> Number of nodes used for running the job in (6)
 
-8. Merging step --> TO BE UPDATED. Please look at merging/
+8. Merging step --> Please look at scripts in merging/. There are 3 steps in order to merge the data and get the MTZ file - 
+
+  a) CXI_MERGE: First we merged each tar file (written out by individual ranks in xtc_process or xtc_process_iota_srs) separately. These jobs are run using the script merge.sh which has all the merging parameters. For the IOTA demo, we used the Ha14 error model available in CXI_MERGE. All the merging jobs can be submitted using submit_all.sh. I tried to process 1000 tar files on a single KNL node in one 24 hour job - the submit_all.sh script reflects that. The tag used is cxic0415_$n where n is rank number in the integrated pickle file. 
+  o Script to submit job --> merging/submission_scripts/submit_all.sh
+  o Script that has the merging parameters and does the work --> merging/submission_scripts/merge.sh
+
+  b) CONCATENATE DB FILES: Once all the merging jobs have finished, we should have a .db file for each tar file that was processed. Before running CXI_XMERGE, we need to concatenate these database file. This is done using the script merging/concatenate_merging_dbs.py. This job can be run on Cori-PII using sbatch_concatenate.sh. The new concatenated database files have the tag cxic0415_all  
+  o script to submit job --> merging/submission_scripts/sbatch_concatenate.sh
+  o script that does the main work underneath --> merging/concatenate_merging_dbs.py
+
+  c) CXI_XMERGE: Finally in order to get statistics like CC1/2, Multiplicity, we have to run CXI_XMERGE. This can be run using the xmerge.sh script. The final xmerge step is quite memory intensive and I had to run it on DIALS.LBL.GOV. This can be done by just copying over the cxic0415_all_* database files 
+  o script to submit job --> merging/submission_scripts/sbatch_xmerge.sh
+  o script that has the parameters and does the work --> merging/submission_scripts/xmerge.sh
+
+9. Statistics from merging: CXI_XMERGE generates the MTZ file for the full dataset  along with MTZ files for the half datasets. Here is what you need to do for each of the metrics reported. l
+
+  o CC1/2 --> Read it off the cxic0415_all_mark0.log 
+  o Multiplicity --> Same as above
+  o CCano --> Run the script cc_anom_calculator and pass in the 2 half dataset MTZ files as arguments. Make sure you have sourced CCTBX_XFEL
