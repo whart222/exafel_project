@@ -5,12 +5,18 @@ Contact: Asmit Bhowmick <abhowmick@lbl.gov>
          Nick Sauter <nksauter@lbl.gov>
 
 
-##### STEPS TO FOLLOW FOR IOTA DEMO ########
+For all the steps below, the workspace where you will be running jobs is called $BASE_PATH
+Prior to following the steps below, make sure you have access to the raw XTC data. The data is available on NERSC at
+/global/cscratch1/sd/psdatmgr/data/psdm/cxi/cxic0415/demo/xtc/
+
+Within that folder above, there is a bigdata file cxic0415.xtc (2.1 Tb) and a smalldata folder. Create a folder in your work directory called $BASE_PATH/xtc2. Soft link the bigdata file as test-r0050.xtc and copy over the smalldata folder into that xtc2  folder. All the runs from cxic0415 are glued together in this one xtc2 file and is named run 50 (test-r0050.xtc) so that all the calibration constants can be picked up correctly.
+
+##### STEPS FOR IOTA DEMO ########
 
 1. Please use the Dockerfile in docker_psana2 in the exafel_project repository to build your own docker/shifter image. 
    If you wish to use the one for the demo on Cori-PII, it is registry.services.nersc.gov/asmit/iota_ps2_v2:latest 
 
-2. Copy over this folder to a location where you wish to process data. That location is your BASE_PATH in the submit
+2. Copy over this folder to a location where you wish to process data. That location is your $BASE_PATH in the submit
    scripts provided here.
 
 3. Next decide which filesystem you would like to read in data from and read out data to. If anything involves burst
