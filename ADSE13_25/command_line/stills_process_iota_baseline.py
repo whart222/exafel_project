@@ -348,7 +348,7 @@ class Processor_iota(Processor):
             # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
             self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
             self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
-            experiments, indexed = self.index(datablock, observed)
+            experiments, indexed = self.index_with_known_orientation(datablock, observed)
             print('fraction subsampled = %5.2f with %d indexed spots ' %(self.params.iota.random_sub_sampling.fraction_sub_sample,len(indexed)))
 
           elif self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
@@ -730,6 +730,68 @@ class Processor_iota(Processor):
       new_origin = tuple((orix,oriy,new_distance))
       panel.set_frame(panel.get_fast_axis(), panel.get_slow_axis(), new_origin )
     return moved_detector
+
+
+
+  def index_with_known_orientation(self, datablock, reflections):
+    ''' Copy of the index function from stills_process to force IOTA to use stills_indexer during known_orientation '''
+    from dials.algorithms.indexing.stills_indexer import stills_indexer
+    from time import time
+    import copy
+    st = time()
+
+    imagesets = datablock.extract_imagesets()
+
+    params = copy.deepcopy(self.params)
+    # don't do scan-varying refinement during indexing
+    params.refinement.parameterisation.scan_varying = False
+
+    if hasattr(self, 'known_crystal_models'):
+      known_crystal_models = self.known_crystal_models
+    else:
+      known_crystal_models = None
+    if params.indexing.stills.method_list is None:
+      idxr = stills_indexer.from_parameters(
+        reflections, imagesets, known_crystal_models=known_crystal_models,
+        params=params)
+      idxr.index()
+    else:
+      indexing_error = None
+      for method in params.indexing.stills.method_list:
+        params.indexing.method = method
+        try:
+          idxr = stills_indexer.from_parameters(
+            reflections, imagesets,
+            params=params)
+          idxr.index()
+        except Exception as e:
+          logger.info("Couldn't index using method %s"%method)
+          if indexing_error is None:
+            if e is None:
+              e = Exception("Couldn't index using method %s"%method)
+            indexing_error = e
+        else:
+          indexing_error = None
+          break
+      if indexing_error is not None:
+        raise indexing_error
+
+    indexed = idxr.refined_reflections
+    experiments = idxr.refined_experiments
+
+    if known_crystal_models is not None:
+      from dials.array_family import flex
+      filtered = flex.reflection_table()
+      for idx in set(indexed['miller_index']):
+        sel = indexed['miller_index'] == idx
+        if sel.count(True) == 1:
+          filtered.extend(indexed.select(sel))
+      print("Filtered duplicate reflections, %d out of %d remaining"%(len(filtered),len(indexed)))
+      indexed = filtered
+
+    return experiments, indexed
+
+
 
 if __name__ == '__main__':
   from dials.util import halraiser
