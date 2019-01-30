@@ -217,6 +217,10 @@ class SpotFinding_Script(Script):
           #from IPython import embed; embed(); exit()
           stats = custom_stats_imageset(
             imageset, all_spots.select(all_spots['id'] == i))
+          n_spots_total = flex.int(stats.n_spots_total)
+          max_number_of_spots = max(stats.n_spots_total)
+          for num_spots in range(1,max_number_of_spots+1):
+            print ("IOTA_NUMBER_OF_SPOTS %d %d"%(num_spots, len(n_spots_total.select(n_spots_total==num_spots))))
           per_image_analysis.print_table(stats)
         logger.info(s.getvalue())
 
