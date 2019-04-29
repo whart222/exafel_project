@@ -302,8 +302,8 @@ class iota_indexer(stills_indexer):
     reflections.set_flags(reflections['miller_index'] != (0,0,0), reflections.flags.indexed)
     reflections['id'].set_selected(flex.size_t(range(len(reflections))), 0)
     # Add predicted reflections
-    from dials.algorithms.refinement.prediction import ExperimentsPredictor
-    ref_predictor = ExperimentsPredictor(experiments, force_stills=experiments.all_stills())
+    from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
+    ref_predictor = ExperimentsPredictorFactory.from_experiments(experiments, force_stills=experiments.all_stills())
     reflections = ref_predictor(reflections)
     reflections['id'].set_selected(flex.size_t(range(len(reflections))), -1)
 
