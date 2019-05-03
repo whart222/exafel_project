@@ -32,7 +32,7 @@ from dials.algorithms.indexing.stills_indexer import stills_indexer
 
 class iota_indexer(stills_indexer):
 
-  def __init__(self, reflections, imagesets, params=None):
+  def __init__(self, reflections, experiments, params=None):
     '''Init function for iota_indexer is different from indexer_base in that
        _setup_symmetry function is not called. All features only work for stills'''
 
@@ -41,7 +41,7 @@ class iota_indexer(stills_indexer):
     # FIXME need to write own __init__ function
     #stills_indexer.__init__(self, reflections, imagesets, params)
     self.reflections = reflections
-    self.imagesets = imagesets
+    self.experiments = experiments
     if params is None: params = master_params
     self.params = params.indexing
     self.all_params = params
@@ -51,9 +51,9 @@ class iota_indexer(stills_indexer):
     if self.params.refinement_protocol.n_macro_cycles in ('auto', libtbx.Auto):
       self.params.refinement_protocol.n_macro_cycles = 1
 
-    for imageset in imagesets[1:]:
-      if imageset.get_detector().is_similar_to(self.imagesets[0].get_detector()):
-        imageset.set_detector(self.imagesets[0].get_detector())
+    for expt in self.experiments[1:]:
+      if expt.detector.is_similar_to(self.experiments[0].detector):
+        expt.detector=self.experiments[0].detector
 
     if 'flags' in self.reflections:
       strong_sel = self.reflections.get_flags(self.reflections.flags.strong)
@@ -69,7 +69,7 @@ class iota_indexer(stills_indexer):
     self.setup_indexing()
 
   @staticmethod
-  def from_parameters(reflections, imagesets,
+  def from_parameters(reflections, experiments,
                       known_crystal_models=None, params=None):
     '''Sets up indexer object that will be used for indexing '''
     if params is None:
@@ -80,15 +80,15 @@ class iota_indexer(stills_indexer):
       #     import indexer_known_orientation
 
       idxr = iota_indexer_known_orientation(
-        reflections, imagesets, params, known_crystal_models)
+        reflections, experiments, params, known_crystal_models)
       #idxr = indexer_known_orientation(
       #  reflections, imagesets, params, known_crystal_models)
     else:
       has_stills = False
       has_sweeps = False
-      for imageset in imagesets:
-        if imageset.get_goniometer() is None or imageset.get_scan() is None or \
-            imageset.get_scan().get_oscillation()[1] == 0:
+      for expt in experiments:
+        if expt.goniometer is None or expt.scan is None or \
+            expt.scan.get_oscillation()[1] == 0:
           if has_sweeps:
             raise Sorry("Please provide only stills or only sweeps, not both")
           has_stills = True
@@ -113,26 +113,35 @@ class iota_indexer(stills_indexer):
 
     # Ensure the indexer and downstream applications treat this as set of stills
     from dxtbx.imageset import ImageSet
-    reset_sets = []
-    for i in range(len(imagesets)):
-      imagesweep = imagesets.pop(0)
-      imageset = ImageSet(imagesweep.data(), imagesweep.indices())
-      imageset.set_scan(None)
-      imageset.set_goniometer(None)
-      reset_sets.append(imageset)
-    imagesets.extend(reset_sets)
+    # DIALS 2.0 stuff here
+    for experiment in experiments:
+      experiment.imageset=ImageSet(experiment.imageset.data(), experiment.imageset.indices())
+      experiment.imageset.set_scan(None)
+      experiment.imageset.set_goniometer(None)
+      experiment.scan=None
+      experiment.goniometer=None
+
+    # Old code prior to DIALS 2.0
+    #reset_sets = []
+    #for i in range(len(imagesets)):
+    #  imagesweep = imagesets.pop(0)
+    #  imageset = ImageSet(imagesweep.data(), imagesweep.indices())
+    #  imageset.set_scan(None)
+    #  imageset.set_goniometer(None)
+    #  reset_sets.append(imageset)
+    #imagesets.extend(reset_sets)
 
     if known_crystal_models is not None:
       from dials.algorithms.indexing.known_orientation \
         import indexer_known_orientation
       idxr = indexer_known_orientation(
-        reflections, imagesets, params, known_crystal_models)
+        reflections, experiments, params, known_crystal_models)
     elif params.indexing.method == "fft3d":
-      idxr = iota_indexer_fft3d(reflections, imagesets, params=params)
+      idxr = iota_indexer_fft3d(reflections, experiments, params=params)
     elif params.indexing.method == "fft1d":
-      idxr = iota_indexer_fft1d(reflections, imagesets, params=params)
+      idxr = iota_indexer_fft1d(reflections, experiments, params=params)
     elif params.indexing.method == "real_space_grid_search":
-      idxr = iota_indexer_real_space_grid_search(reflections, imagesets, params=params)
+      idxr = iota_indexer_real_space_grid_search(reflections, experiments, params=params)
     return idxr
 
   def index(self, provided_experiments=None,debug=False):

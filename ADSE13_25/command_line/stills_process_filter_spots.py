@@ -29,6 +29,9 @@ iota {
     .help = Type of IOTA processing to be done. \
             off : No IOTA processing is done. \
             random-sub-sampling : randomly sub-sample observed bragg spots and index. Can be done multiple times. See options for random-sub-sampling if this is used.
+  filter_spots = False
+    .type = bool
+    .help = if True, it filters out spots that are too close to each other spatially on the detector. Done in a pairwise basis
   random_sub_sampling {
     ntrials = 50
       .type = int
@@ -387,31 +390,28 @@ class Processor_iota(Processor):
             return
         try:
             # Try finding spots that are too close to each other and kick one of them out
-            #import pdb; pdb.set_trace()
-            obs = observed['xyzobs.px.value']
-            critical_robs = 7.0
-            from scitbx.matrix import col
-            from annlib_ext import AnnAdaptor
-            from scitbx.array_family import flex
-            pop_indices = []
-            xx = []
-            for ii in range(len(obs)):
-                for jj in range(ii+1,len(obs)):
-                    robs = (col(obs[ii]) - col(obs[jj])).length()
-                    xx.append(robs)
-                    #print (robs)
-                    if robs < critical_robs:
-                        pop_indices.extend([ii,jj])
-            if len(pop_indices) > 1:
-                pop_indices = list(set(pop_indices))
-                pop_table = [1]*len(observed)
-                for ii in range(len(observed)):
-                    if ii in pop_indices:
-                        pop_table[ii]=0
-                observed = observed.select(flex.bool(pop_table))
-                from libtbx.easy_pickle import dump
-                dump('filtered.pickle', observed)
-                #from IPython import embed; embed(); exit()
+            if self.params.iota.filter_spots:
+                obs = observed['xyzobs.px.value']
+                critical_robs = 7.0
+                from scitbx.matrix import col
+                from annlib_ext import AnnAdaptor
+                from scitbx.array_family import flex
+                pop_indices = []
+                for ii in range(len(obs)):
+                    for jj in range(ii+1,len(obs)):
+                        robs = (col(obs[ii]) - col(obs[jj])).length()
+                        #print (robs)
+                        if robs < critical_robs:
+                            pop_indices.extend([ii,jj])
+                if len(pop_indices) > 1:
+                    pop_indices = list(set(pop_indices))
+                    pop_table = [1]*len(observed)
+                    for ii in range(len(observed)):
+                        if ii in pop_indices:
+                            pop_table[ii]=0
+                    observed = observed.select(flex.bool(pop_table))
+                    from libtbx.easy_pickle import dump
+                    dump('filtered.pickle', observed)
 
             if self.params.dispatch.index:
                 if self.params.iota.method == 'random_sub_sampling':
@@ -435,6 +435,7 @@ class Processor_iota(Processor):
                         try:
                             print ('IOTA: SUM_INTENSITY_VALUE',sum(observed_sample['intensity.sum.value']), ' ',trial, len(observed_sample))
                             if self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
+                                import pdb; pdb.set_trace()
                                 experiments_tmp, indexed_tmp = self.index_with_iota(experiments, observed_sample)
                             elif self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
                                 experiments_tmp, indexed_tmp = self.index(experiments, observed_sample)
@@ -791,7 +792,7 @@ class Processor_iota(Processor):
 
         if params.indexing.stills.method_list is None:
             idxr = iota_indexer.from_parameters(
-              reflections, imagesets, known_crystal_models=known_crystal_models,
+              reflections, experiments, known_crystal_models=known_crystal_models,
               params=params)
             idxr.index()
         else:
@@ -800,7 +801,7 @@ class Processor_iota(Processor):
                 params.indexing.method = method
                 try:
                     idxr = iota_indexer.from_parameters(
-                      reflections, imagesets,
+                      reflections, experiments,
                       params=params)
                     idxr.index()
                 except Exception as e:
