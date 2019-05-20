@@ -25,11 +25,10 @@ class iota_refiner(stills_indexer):
   ''' Class for doing refinement and outlier rejection after iota indexing is done
       Although this class subclasses stills_indexer, it should never be used for any
       iota related indexing. There is a separate class for that.'''
-  def __init__ (self, experiments, indexed, imagesets,params):
+  def __init__ (self, reflections, experiments, params):
     self.all_params = params
-    self.reflections = indexed
+    self.reflections = reflections
     self.experiments = experiments
-    self.imagesets = imagesets
 
   def run_refinement_and_outlier_rejection(self):
     ''' Code taken from the index function of stills_indexer '''
@@ -80,18 +79,16 @@ class iota_refiner(stills_indexer):
     self.refined_reflections = refined_reflections.select(
       refined_reflections['id'] > -1)
 
-    for i, imageset in enumerate(self.imagesets):
-      ref_sel = self.refined_reflections.select(
-        self.refined_reflections['imageset_id'] == i)
-      ref_sel = ref_sel.select(ref_sel['id'] >= 0)
-      for i_expt in set(ref_sel['id']):
-        expt = refined_experiments[i_expt]
-        imageset.set_detector(expt.detector)
-        imageset.set_beam(expt.beam)
-        imageset.set_goniometer(expt.goniometer)
-        imageset.set_scan(expt.scan)
-        expt.imageset = imageset
-
+    for i, expt in enumerate(self.experiments):
+      ref_sel = self.refined_reflections.select(self.refined_reflections["imageset_id"] == i)
+      ref_sel = ref_sel.select(ref_sel["id"] >= 0)
+      for i_expt in set(ref_sel["id"]):
+        refined_expt = refined_experiments[i_expt]
+        expt.detector = refined_expt.detector
+        expt.beam = refined_expt.beam
+        expt.goniometer = refined_expt.goniometer
+        expt.scan = refined_expt.scan
+        refined_expt.imageset = expt.imageset
 
     if not (self.all_params.refinement.parameterisation.beam.fix == 'all'
             and self.all_params.refinement.parameterisation.detector.fix == 'all'):
@@ -100,11 +97,9 @@ class iota_refiner(stills_indexer):
 
       spots_mm = self.reflections
       self.reflections = flex.reflection_table()
-      for i, imageset in enumerate(self.imagesets):
-        spots_sel = spots_mm.select(spots_mm['imageset_id'] == i)
-        self.map_centroids_to_reciprocal_space(
-          spots_sel, imageset.get_detector(), imageset.get_beam(),
-          imageset.get_goniometer())
+      for i, expt in enumerate(self.experiments):
+        spots_sel = spots_mm.select(spots_mm["imageset_id"] == i)
+        spots_sel.map_centroids_to_reciprocal_space(expt.detector, expt.beam, expt.goniometer)
         self.reflections.extend(spots_sel)
 
     # update for next cycle
@@ -142,7 +137,7 @@ class iota_refiner(stills_indexer):
     if 'xyzcal.mm' in self.refined_reflections: # won't be there if refine_all_candidates = False and no isoforms
       self.refined_reflections['xyzcal.px'] = flex.vec3_double(
         len(self.refined_reflections))
-      for i, imageset in enumerate(self.imagesets):
+      for i, imageset in enumerate(self.experiments.imagesets()):
         imgset_sel = self.refined_reflections['imageset_id'] == i
         # set xyzcal.px field in self.refined_reflections
         refined_reflections = self.refined_reflections.select(imgset_sel)
