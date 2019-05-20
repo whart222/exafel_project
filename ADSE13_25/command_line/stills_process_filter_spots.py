@@ -58,17 +58,24 @@ iota {
               reindex_with_known_crystal_models will just index the spots with \
               known_orientation_indexer. Useful if clustering fails but indexing \
               succeeds in limited trials
-    Z_cutoff = 1.0
+    Z_cutoff = 1.3
       .type = float
       .help = Z-score cutoff for accepting/rejecting bragg spots based on difference between \
               fractional and integer hkl. This will be used for finalize_method = union_and_reindex
-    min_indexed_spots = 16
+    min_indexed_spots = 7
       .type = int
       .help = minimum number of spots that should be indexed on an image by a model
     align_calc_spots_with_obs = True
       .type = bool
       .help = if True, adjusts detector distance to try minimize rcalc-robs for unrefined indexing \
               results.
+    debug_mode = True
+      .type = bool
+      .help = If enabled, it will dump the json/pickles of all the IOTA trials and exit. Useful when debugging\
+              remainder of the program
+    load_pickle_flag = True
+      .type = bool
+      .help = If enabled, it will load dumped json/pickle of an IOTA trial and proceed with clustering and refinement 
 
   }
   include scope exafel_project.ADSE13_25.clustering.consensus_functions.clustering_iota_scope
@@ -395,7 +402,7 @@ class Processor_iota(Processor):
                 critical_robs = 7.0
                 from scitbx.matrix import col
                 from annlib_ext import AnnAdaptor
-                from scitbx.array_family import flex
+                from dials.array_family import flex
                 pop_indices = []
                 for ii in range(len(obs)):
                     for jj in range(ii+1,len(obs)):
@@ -415,7 +422,8 @@ class Processor_iota(Processor):
 
             if self.params.dispatch.index:
                 if self.params.iota.method == 'random_sub_sampling':
-                    from scitbx.array_family import flex
+                    from dxtbx.model.experiment_list import ExperimentList, Experiment
+                    from dials.array_family import flex
                     len_max_indexed = -999
                     experiments_list = []
                     self.known_crystal_models=None
@@ -429,14 +437,28 @@ class Processor_iota(Processor):
                         self.params.indexing.stills.refine_all_candidates=False
 
                     observed_samples_list = []
+                    dump_refls=flex.reflection_table()
+                    dump_expts=ExperimentList()
+                    expt_id=-1
+                    debug_mode=self.params.iota.random_sub_sampling.debug_mode
+                    load_pickle_flag=self.params.iota.random_sub_sampling.load_pickle_flag
                     for trial in range(self.params.iota.random_sub_sampling.ntrials):
+                        if not debug_mode:
+                            continue
                         flex.set_random_seed(trial+1001)
                         observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
                         try:
                             print ('IOTA: SUM_INTENSITY_VALUE',sum(observed_sample['intensity.sum.value']), ' ',trial, len(observed_sample))
                             if self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
-                                import pdb; pdb.set_trace()
+                                #import pdb; pdb.set_trace()
                                 experiments_tmp, indexed_tmp = self.index_with_iota(experiments, observed_sample)
+                                for ii,expt_tmp in enumerate(experiments_tmp):
+                                    expt_id +=1
+                                    #indexed_tmp['id'].set_selected(indexed_tmp['id']==ii,expt_id)
+                                    refl=indexed_tmp.select(indexed_tmp['id']==ii)
+                                    refl['id'].set_selected(flex.bool([True]*len(refl['id'])), expt_id)
+                                    dump_refls.extend(refl)
+                                    dump_expts.append(expt_tmp)
                             elif self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
                                 experiments_tmp, indexed_tmp = self.index(experiments, observed_sample)
 
@@ -444,14 +466,23 @@ class Processor_iota(Processor):
                             observed_samples_list.append(observed_sample)
                         except Exception as e:
                             print('Indexing failed for some reason', str(e))
-                    #from libtbx.easy_pickle import dump,load
-                    #dump('experiments_list.pickle', experiments_list)
-                    #dump('observed_samples_list.pickle', observed_samples_list)
-                    #exit()
+                    from libtbx.easy_pickle import dump,load
+                    if debug_mode:
+                        dump('experiments_list.pickle', experiments_list)
+                        dump('observed_samples_list.pickle', observed_samples_list)
+                        from dxtbx.model.experiment_list import ExperimentListDumper
+                        from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
+                        ref_predictor = ExperimentsPredictorFactory.from_experiments(dump_expts, force_stills=experiments.all_stills())
+                        dump_refls=ref_predictor(dump_refls)
+                        dump('indexed_list.pickle', dump_refls)
+                        dump = ExperimentListDumper(dump_expts)
+                        dump.as_json('indexed_exp.json')
+                        exit()
                     #from libtbx.easy_pickle import load
-                    #experiments_list = load('experiments_list.pickle')
-                    #observed_samples_list = load('observed_samples_list.pickle')
-                    #from IPython import embed; embed(); exit()
+                    if not debug_mode and load_pickle_flag:
+                        experiments_list = load('experiments_list.pickle')
+                        observed_samples_list = load('observed_samples_list.pickle')
+                    # Dump out json file and pickle file of the indexed reflections as separate ids
                     if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
                         if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
                             from exafel_project.ADSE13_25.clustering.old_consensus_functions import get_uc_consensus as get_consensus
@@ -461,22 +492,21 @@ class Processor_iota(Processor):
                             known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering)
                        # from IPython import embed; embed(); exit()
                     print ('IOTA: Finalizing consensus')
+                    #import pdb; pdb.set_trace() 
                     if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
                         print ('IOTA: Chosen finalize method is reindex_with_known_crystal_models')
                         self.known_crystal_models = known_crystal_models
                         # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
                         self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
                         self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
-                        import pdb; pdb.set_trace()
                         experiments, indexed = self.index_with_known_orientation(experiments, observed)
                         print('fraction subsampled = %5.2f with %d indexed spots ' %(self.params.iota.random_sub_sampling.fraction_sub_sample,len(indexed)))
 
                     elif self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
                         print ('IOTA: Chosen finalize method is union_and_reindex')
                         # Take union of all spots used to index each lattice cluster
-                        from dials.array_family import flex as dials_flex
                         from dxtbx.model.experiment_list import ExperimentList, Experiment
-                        indexed = dials_flex.reflection_table()
+                        indexed = flex.reflection_table()
                         #experiments = ExperimentList()
                         sample = {}
                         all_experimental_models = {}
@@ -491,7 +521,7 @@ class Processor_iota(Processor):
                                 sample[crystal_model].append(observed_samples_list[idx]['spot_id'])
                                 all_experimental_models[crystal_model].append(experiments_list[idx])
                         # FIXME take out
-                        all_indexed_tmp = dials_flex.reflection_table()
+                        all_indexed_tmp = flex.reflection_table()
                         all_experiments_tmp = ExperimentList()
                         tmp_counter = 0
                         for crystal_model in sample:
@@ -517,7 +547,7 @@ class Processor_iota(Processor):
                                 explist_centroid.append(exp)
 
                             from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
-                            reidxr = iota_indexer(union_observed, imagesets,params=self.params)
+                            reidxr = iota_indexer(union_observed, experiments,params=self.params)
                             reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist_centroid)
                             experiments_centroid = explist_centroid
                             indexed_centroid = reidxr.reflections
@@ -525,28 +555,30 @@ class Processor_iota(Processor):
                             if self.params.iota.random_sub_sampling.align_calc_spots_with_obs:
                                 # Move detector to bring calculated spots onto observed spots.
                                 # Only done in radial direction
+                                print ('Aligning calculated spots with observation by displacing detector along z')
                                 assert len(experiments_centroid.detectors()) == 1, 'aligning spots only work with one detector'
                                 import copy
-                                image_identifier = imagesets[0].get_image_identifier(0)
+                                image_identifier = experiments.imagesets()[0].get_image_identifier(0)
                                 moved_detector = self.move_detector_to_bring_calc_spots_onto_obs(experiments_centroid.detectors()[0], experiments_centroid.beams()[0], indexed_centroid, image_identifier)
                                 # Reindex everything again with new detector distance!
                                 explist_centroid = ExperimentList()
 
-                            for i,i_expt in enumerate(experiments):
-                                i_expt.imageset.set_detector(moved_detector)
-                                exp = Experiment(imageset=i_expt.imageset,
+                                for i,i_expt in enumerate(experiments):
+                                    i_expt.imageset.set_detector(moved_detector)
+                                    exp = Experiment(imageset=i_expt.imageset,
                                                  beam=i_expt.beam,
                                                  detector=i_expt.detector,
                                                  goniometer=i_expt.goniometer,
                                                  scan=i_expt.scan,
                                                  crystal=known_crystal_models[crystal_model])
-                                explist_centroid.append(exp)
+                                    explist_centroid.append(exp)
 
-                                from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
-                                reidxr = iota_indexer(union_observed, imagesets,params=self.params)
-                                reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist_centroid)
-                                experiments_centroid = explist_centroid
-                                indexed_centroid = reidxr.reflections
+                            from exafel_project.ADSE13_25.indexing.indexer_iota import iota_indexer
+                            reidxr = iota_indexer(union_observed, experiments,params=self.params)
+                            reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist_centroid)
+                            print ('Done taking fractional HKLs')
+                            experiments_centroid = explist_centroid
+                            indexed_centroid = reidxr.reflections
 
                             indexed_centroid['id'].set_selected(flex.size_t(range(len(indexed_centroid))), crystal_model)
                             print ('finished evaluating centroid indexing results for crystal model ',crystal_model)
@@ -556,6 +588,7 @@ class Processor_iota(Processor):
                             hkl_all_values = {}
                             for obs in all_experimental_models[crystal_model]:
                                 try:
+                                    #import pdb; pdb.set_trace()
                                     explist = ExperimentList()
                                     self.known_crystal_models = None #[obs.crystals()[0]]
 
@@ -564,8 +597,11 @@ class Processor_iota(Processor):
                                     from cctbx_orientation_ext import crystal_orientation
                                     cryst_ref_ori = crystal_orientation(explist_centroid.crystals()[0].get_A(), True)
                                     cryst_tmp_ori = crystal_orientation(obs.crystals()[0].get_A(), True)
+                                    #print ('A-matrix reference=', cryst_ref_ori.direct_matrix())
+                                    print ('A-matrix reference=', cryst_tmp_ori.direct_matrix())
+                                    #from IPython import embed; embed(); exit()
                                     best_similarity_transform = cryst_tmp_ori.best_similarity_transformation(
-                                      other = cryst_ref_ori, fractional_length_tolerance = 10.00,
+                                      other = cryst_ref_ori, fractional_length_tolerance = 50.00,
                                       unimodular_generator_range=1)
                                     cryst_tmp_ori_best=cryst_tmp_ori.change_basis(best_similarity_transform)
                                     obs.crystals()[0].set_A(cryst_tmp_ori_best.reciprocal_matrix())
@@ -579,7 +615,7 @@ class Processor_iota(Processor):
                                                        scan=i_expt.scan,
                                                        crystal=obs.crystals()[0])
                                         explist.append(exp)
-                                    reidxr = iota_indexer(union_observed, imagesets,params=self.params)
+                                    reidxr = iota_indexer(union_observed, experiments, params=self.params)
                                     reidxr.calculate_fractional_hkl_from_Ainverse_q(reidxr.reflections, explist)
                                     experiments_tmp = explist
                                     indexed_tmp = reidxr.reflections
@@ -609,9 +645,11 @@ class Processor_iota(Processor):
                                     print ('Reindexing with candidate lattices on union set failed', str(e))
                             # Get a sense of the variability in dh. Assign Z-score cutoff from there
                             try:
+                                #from IPython import embed; embed(); exit()
                                 Z_cutoff = self.params.iota.random_sub_sampling.Z_cutoff
                                 # Now go through the spots indexed by the cluster center and reject if dh greater than Z_cutoff
                                 indexed_spots_idx = []
+                                print ('MILLER_INDEX_DH_STATS', ' (H, K, L)', ' ', ' delta_H ','     ','delta_H_cutoff','   ','resolution')
                                 for ii,refl in enumerate(indexed_centroid):
                                     dh = flex.double([refl['miller_index'][0]-refl['fractional_miller_index'][0],
                                                   refl['miller_index'][1]-refl['fractional_miller_index'][1],
@@ -628,6 +666,8 @@ class Processor_iota(Processor):
                                     beam = experiments_centroid.beams()[0]
                                     resolution = panel.get_resolution_at_pixel(beam.get_s0(),refl['xyzobs.px.value'][0:2])
                                     print ('MILLER_INDEX_DH_STATS', refl['miller_index'], ' ',dh,' ',dh_cutoff,' ',resolution)
+                                    #if dh_cutoff > 0.4:
+                                    #    dh_cutoff=0.4
 
                                     #self.refine(all_experiments_tmp, all_indexed_tmp)
                                     #from IPython import embed; embed(); exit()
@@ -635,9 +675,11 @@ class Processor_iota(Processor):
                                     if dh < dh_cutoff and refl['miller_index'] != (0,0,0):
                                         indexed_spots_idx.append(ii)
                                 # Make sure the number of spots indexed by a model is above a threshold
+                                #import pdb; pdb.set_trace()
                                 if len(indexed_centroid.select(flex.size_t(indexed_spots_idx))) > self.params.iota.random_sub_sampling.min_indexed_spots:
                                     indexed.extend(indexed_centroid.select(flex.size_t(indexed_spots_idx)))
                                     # Need to append properly
+                                    unrefined_experiments=ExperimentList()
                                     for iexpt,expt in enumerate(experiments_centroid):
                                         print ('APPENDING EXPERIMENT = ',crystal_model,iexpt)
                                         # If detector was moved to align calculated spots with observed then
@@ -646,7 +688,7 @@ class Processor_iota(Processor):
                                         if self.params.iota.random_sub_sampling.align_calc_spots_with_obs:
                                             expt.imageset.set_detector(original_detector)
                                             expt.detector = original_detector
-                                        experiments.append(expt)
+                                        unrefined_experiments.append(expt)
 
                             except Exception as e:
                                 print ('dh_list calculation and outlier rejection failed',str(e))
@@ -662,14 +704,18 @@ class Processor_iota(Processor):
                         for ii,iid in enumerate(original_ids):
                             indexed['id'].set_selected(indexed['id'] == iid,ii)
                         # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
-                        self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
-                        self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
+                        # Forcing to be true. Should be reverted
+                        # FIXME
+                        self.params.indexing.stills.candidate_outlier_rejection=True #outlier_rejection_flag
+                        self.params.indexing.stills.refine_all_candidates=True #refine_all_candidates_flag
                         # Perform refinement and outlier rejection
+                        #import pdb; pdb.set_trace()
                         from exafel_project.ADSE13_25.refinement.iota_refiner import iota_refiner
-                        refiner=iota_refiner(experiments, indexed, imagesets,self.params)
+                        refiner=iota_refiner(indexed, unrefined_experiments, self.params)
+                        #from IPython import embed; embed(); exit()
                         experiments,indexed = refiner.run_refinement_and_outlier_rejection()
-
                     try:
+                        print ('REFINEINGNONE')
                         experiments,indexed = self.refine(experiments, indexed)
                     except Exception as e:
                         print("Error refining", tag, str(e))
@@ -840,7 +886,7 @@ class Processor_iota(Processor):
             Code only works for a single detector right now. Multiple detectors will fail'''
         import copy
         from scitbx.matrix import col
-        from scitbx.array_family import flex
+        from dials.array_family import flex
         moved_detector = copy.deepcopy(detector)
         dnew = flex.double() # list to store all the dnew values
         for ii in range(len(indexed)):
@@ -851,7 +897,6 @@ class Processor_iota(Processor):
             rcal = col(indexed[ii]['xyzcal.mm'][0:2]) - r0 #- col(panel.get_origin()[0:2])
             robs = col(indexed[ii]['xyzobs.mm.value'][0:2]) - r0 #- col(panel.get_origin()[0:2])
             dnew.append((robs.length()/rcal.length())*D)
-        #from IPython import embed; embed(); exit()
 
         new_distance = flex.mean(dnew)
         print ('NEW_DET_DISTANCE ',new_distance)
