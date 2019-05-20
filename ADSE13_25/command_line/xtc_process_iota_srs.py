@@ -17,7 +17,6 @@ import libtbx.load_env
 from libtbx.utils import Sorry, Usage
 from dials.util.options import OptionParser
 from libtbx.phil import parse
-from dxtbx.datablock import DataBlockFactory
 from scitbx.array_family import flex
 import numpy as np
 from libtbx import easy_pickle
@@ -35,10 +34,10 @@ iota_phil_str = '''
               off : No IOTA processing is done. \
               random-sub-sampling : randomly sub-sample observed bragg spots and index. Can be done multiple times. See options for random-sub-sampling if this is used.
     random_sub_sampling {
-      ntrials = 10
+      ntrials = 50
         .type = int
         .help = Number of random sub-samples to be selected
-      fraction_sub_sample = 0.2
+      fraction_sub_sample = 0.8
         .type = float
         .help = fraction of sample to be sub-sampled. Should be between 0 and 1
       consensus_function = *unit_cell
@@ -76,7 +75,7 @@ class IOTA_TimeoutError(Exception):
 
 class InMemScript_iota(InMemScript):
 
-  def index(self, datablock, observed):
+  def index(self, experiments, observed):
     ''' IOTA-SRS indexing. Goes through ntrials and indexes subsamples'''
     # index and refine
     if self.params.iota.method == 'random_sub_sampling':
@@ -101,48 +100,42 @@ class InMemScript_iota(InMemScript):
         observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
         try:
           print('IOTA:SUM_INTENSITY_VALUE=%d',sum(observed_sample['intensity.sum.value']),' ', trial)
-          experiments_tmp, indexed_tmp = self.index_with_iota(datablock, observed_sample)
+          experiments_tmp, indexed_tmp = self.index_with_iota(experiments, observed_sample)
           experiments_list.append(experiments_tmp)
         except Exception as e:
-          print('Indexing failed for some reason')
+          print('Indexing failed for some reason', str(e))
       if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
         #from IPython import embed; embed(); exit()
         from exafel_project.ADSE13_25.clustering.old_consensus_functions import get_uc_consensus as get_consensus
           #known_crystal_models = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model = False)
         if len(experiments_list) > 0:
-          known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=False, return_only_first_indexed_model=False, finalize_method=None, clustering_params=None)
+          known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=False, return_only_first_indexed_model=True, finalize_method=None, clustering_params=None)
           self.known_crystal_models = known_crystal_models
         print ('IOTA: Reindexing with best chosen crystal model')
           # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
         self.params.indexing.stills.candidate_outlier_rejection=outlier_rejection_flag
         self.params.indexing.stills.refine_all_candidates=refine_all_candidates_flag
     #
-      experiments, indexed = self.index_with_known_orientation(datablock, observed)
-      return experiments,indexed
-    else:
-      experiments, indexed = self.index_with_iota(datablock, observed)
-      return experiments,indexed
+        experiments, indexed = self.index_with_known_orientation(experiments, observed)
+        return experiments,indexed
+    return
+    #else:
+    #  experiments, indexed = self.index_with_iota(experiments, observed)
+    #  return experiments,indexed
 #
-  def index_with_iota(self, datablock, reflections):
+  def index_with_iota(self, experiments, reflections):
     ''' Copy of index method from DialsFrameLogging class in xfel/ui/frame'''
-    experiments, indexed = super(DialsProcessorWithLogging, self).index(datablock, reflections)
-
-    if not(self.params.dispatch.integrate):
-      run, timestamp = self.get_run_and_timestamp(experiments)
-      self.log_frame(experiments, indexed, run, len(indexed), timestamp = timestamp,
-                     two_theta_low = self.tt_low, two_theta_high = self.tt_high,
-                     db_event = self.db_event)
+    experiments, indexed = super(DialsProcessorWithLogging, self).index(experiments, reflections)
     return experiments, indexed
 
-  def index_with_known_orientation(self, datablock, reflections):
+  def index_with_known_orientation(self, experiments, reflections):
     ''' Copy of the index function from stills_process to force IOTA to use stills_indexer during known_orientation '''
     from dials.algorithms.indexing.stills_indexer import stills_indexer
     from time import time
     import copy
     st = time()
 
-    imagesets = datablock.extract_imagesets()
-
+    imagesets = experiments.imagesets()
     params = copy.deepcopy(self.params)
     # don't do scan-varying refinement during indexing
     params.refinement.parameterisation.scan_varying = False

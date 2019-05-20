@@ -17,7 +17,6 @@ import libtbx.load_env
 from libtbx.utils import Sorry, Usage
 from dials.util.options import OptionParser
 from libtbx.phil import parse
-from dxtbx.datablock import DataBlockFactory
 from scitbx.array_family import flex
 import numpy as np
 from libtbx import easy_pickle
@@ -76,7 +75,7 @@ class IOTA_TimeoutError(Exception):
 
 class InMemScript_iota(InMemScript):
 
-  def index(self, datablock, observed):
+  def index(self, experiments, observed):
     ''' IOTA-SRS indexing. Goes through ntrials and indexes subsamples'''
     # index and refine
     if self.params.iota.method == 'random_sub_sampling':
@@ -85,13 +84,15 @@ class InMemScript_iota(InMemScript):
       self.known_crystal_models = None
 
       # Adding temporary flags here for now. Will be moved to PHIL params if they work at all
-      perturb_xyz=False
+      perturb_xyz=True
       #
-      detector = datablock.extract_imagesets()[0].get_detector()
+      #detector = datablock.extract_imagesets()[0].get_detector()
+      # Getting only the first detector
+      detector=experiments.detectors()[0]
       panel = detector[0]
       OriX, OriY, OriZ = panel.get_origin()
-      scale_factor_in_px = 3.0 # Number of pixels max displacement
-      scale_factor_dist = 0.4 # distance in Z to be max to be perturbed, 0.2 from A.S Brewster et. al (2018) paper
+      scale_factor_in_px = 2.0 # Number of pixels max displacement
+      scale_factor_dist = 0.2 # distance in Z to be max to be perturbed, 0.2 from A.S Brewster et. al (2018) paper
       px_size = panel.get_pixel_size()[0] # Pixel size in mm, assume square pixels
       # Adding timeout option for IOTA
       initial_time = time.time()
@@ -108,25 +109,25 @@ class InMemScript_iota(InMemScript):
           panel.set_frame(panel.get_fast_axis(), panel.get_slow_axis(), (new_OriX, new_OriY, new_OriZ))
         try:
           print ('GRID_XY', trial, new_OriZ)
-          experiments, indexed = self.index_with_iota(datablock, observed)
-          break
+          experiments, indexed = self.index_with_iota(experiments, observed)
+          return experiments, indexed
         except Exception as e:
-          print('Indexing failed for some reason')
-      return experiments,indexed
+          print('Indexing failed for some reason', str(e))
+      return
 #
-  def index_with_iota(self, datablock, reflections):
+  def index_with_iota(self, experiments, reflections):
     ''' Copy of index method from DialsFrameLogging class in xfel/ui/frame'''
-    experiments, indexed = super(DialsProcessorWithLogging, self).index(datablock, reflections)
+    experiments, indexed = super(DialsProcessorWithLogging, self).index(experiments, reflections)
     return experiments, indexed
 
-  def index_with_known_orientation(self, datablock, reflections):
+  def index_with_known_orientation(self, experiments, reflections):
     ''' Copy of the index function from stills_process to force IOTA to use stills_indexer during known_orientation '''
     from dials.algorithms.indexing.stills_indexer import stills_indexer
     from time import time
     import copy
     st = time()
 
-    imagesets = datablock.extract_imagesets()
+    imagesets = experiments.imagesets()
 
     params = copy.deepcopy(self.params)
     # don't do scan-varying refinement during indexing
