@@ -52,7 +52,7 @@ def get_dij_ori(cryst1, cryst2, is_reciprocal=True):
   cryst2_ori = crystal_orientation(cryst2.get_A(), is_reciprocal)
   try:
     best_similarity_transform = cryst2_ori.best_similarity_transformation(
-        other = cryst1_ori, fractional_length_tolerance = 10.00,
+        other = cryst1_ori, fractional_length_tolerance = 1.00,
         unimodular_generator_range=1)
     cryst2_ori_best=cryst2_ori.change_basis(best_similarity_transform)
   except Exception:
@@ -84,25 +84,66 @@ class clustering_manager(group_args):
 #
 #
     print ('Z_DELTA = ',self.Z_delta)
-    for ic in range(NN):
-      # test the density & rho
-      item_idx = delta_order[ic]
-      delta_stats = flex.mean_and_variance(delta)
-      if ic != 0:
-        if (delta[item_idx]-delta_stats.mean())/delta_stats.unweighted_sample_standard_deviation() < self.Z_delta:
-        #if delta[item_idx] <= 0.25*delta[delta_order[0]]: # too low to be a medoid
-          continue
-      try:
-        if self.debug:
-          from IPython import embed; embed()
-      except AttributeError:
-        print ('debug attribute not present')
-      item_rho_order = rho_order_list.index(item_idx)
-      if (item_rho_order)/NN < MAX_PERCENTILE_RHO:
+
+
+    pick_top_solution=False
+    rho_stdev = flex.mean_and_variance(rho.as_double()).unweighted_sample_standard_deviation()
+    delta_stdev = flex.mean_and_variance(delta).unweighted_sample_standard_deviation()
+    if rho_stdev !=0.0 and delta_stdev !=0:
+      rho_z=(rho.as_double()-flex.mean(rho.as_double()))/(rho_stdev)
+      delta_z=(delta-flex.mean(delta))/(delta_stdev)
+    else:
+      pick_top_solution=True
+      if rho_stdev == 0.0:
+        centroids = [flex.first_index(delta,flex.max(delta))]
+      elif delta_stdev == 0.0:
+        centroids = [flex.first_index(rho,flex.max(rho))]
+
+    significant_delta = []
+    significant_rho = []
+    debug_fix_clustering = True
+    if debug_fix_clustering:
+      if not pick_top_solution:
+        delta_z_cutoff = min(1.0, max(delta_z))
+        rho_z_cutoff = min(1.0, max(rho_z))
+        for ic in range(NN):
+          # test the density & rho
+          if delta_z[ic] >= delta_z_cutoff:
+            significant_delta.append(ic)
+          if rho_z[ic] >= rho_z_cutoff:
+            significant_rho.append(ic)
+        centroid_candidates = list(set(significant_delta).intersection(set(significant_rho)))
+        # Now compare the relative orders of the max delta_z and max rho_z to make sure they are within 1 stdev
+        centroids = []
+        max_delta_z_candidates = -999.9
+        max_rho_z_candidates = -999.9
+        for ic in centroid_candidates:
+          if delta_z[ic] > max_delta_z_candidates:
+            max_delta_z_candidates = delta_z[ic]
+          if rho_z[ic] > max_rho_z_candidates:
+            max_rho_z_candidates = rho_z[ic]
+        for ic in centroid_candidates:
+          if max_delta_z_candidates - delta_z[ic] < 1.0 and max_rho_z_candidates - rho_z[ic] < 1.0:
+            centroids.append(ic)
+
+      item_idxs = [delta_order[ic] for ic,centroid in enumerate(centroids)]
+      for item_idx in item_idxs:
         cluster_id[item_idx] = n_cluster
-        print ('CLUSTERING_STATS',ic,item_idx,item_rho_order,cluster_id[item_idx])
+        print ('CLUSTERING_STATS',item_idx,cluster_id[item_idx] )
         n_cluster +=1
-#
+        ####
+    else:
+      for ic in range(NN):
+        item_idx = delta_order[ic]
+        if ic != 0:
+          if delta[item_idx] <= 0.25*delta[delta_order[0]]: # too low to be a medoid
+            continue
+        item_rho_order = rho_order_list.index(item_idx)
+        if (item_rho_order)/NN < MAX_PERCENTILE_RHO:
+          cluster_id[item_idx] = n_cluster
+          print ('CLUSTERING_STATS',ic,item_idx,item_rho_order,cluster_id[item_idx])
+          n_cluster +=1
+    ###
 #
     print ('Found %d clusters'%n_cluster)
     for x in range(NN):
@@ -200,6 +241,9 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   Dij = NCDist_flatten(MM_double)
   from scitbx.math import five_number_summary
   d_c = clustering_params.d_c #five_number_summary(list(Dij))[1]
+  d_c = flex.mean_and_variance(Dij.as_1d()).unweighted_sample_standard_deviation()
+  if len(cells) < 5:
+    return [experiments_list[0].crystals()[0]], None
   CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=clustering_params.max_percentile_rho_uc,Z_delta=clustering_params.Z_delta)
   n_cluster = 1+flex.max(CM.cluster_id_final)
   print (len(cells), ' datapoints have been analyzed')
@@ -292,6 +336,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       #if cluster == 2:
       #  CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85, debug=True)
       #else:
+      d_c_ori=flex.mean_and_variance(Dij_ori[cluster].as_1d()).unweighted_sample_standard_deviation()
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=clustering_params.max_percentile_rho_ori, Z_delta=clustering_params.Z_delta)
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       for i in range(n_cluster_ori):
