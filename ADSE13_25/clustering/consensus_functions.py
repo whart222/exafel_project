@@ -52,10 +52,11 @@ def get_dij_ori(cryst1, cryst2, is_reciprocal=True):
   cryst2_ori = crystal_orientation(cryst2.get_A(), is_reciprocal)
   try:
     best_similarity_transform = cryst2_ori.best_similarity_transformation(
-        other = cryst1_ori, fractional_length_tolerance = 1.00,
+        other = cryst1_ori, fractional_length_tolerance = 20.00,
         unimodular_generator_range=1)
     cryst2_ori_best=cryst2_ori.change_basis(best_similarity_transform)
-  except Exception:
+  except Exception as e:
+    print (str(e))
     cryst2_ori_best = cryst2_ori
   #print 'difference z-score = ', cryst1_ori.difference_Z_score(cryst2_ori_best)
   return cryst1_ori.difference_Z_score(cryst2_ori_best)

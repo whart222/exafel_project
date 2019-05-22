@@ -579,7 +579,6 @@ class Processor_iota(Processor):
                             print ('Done taking fractional HKLs')
                             experiments_centroid = explist_centroid
                             indexed_centroid = reidxr.reflections
-
                             indexed_centroid['id'].set_selected(flex.size_t(range(len(indexed_centroid))), crystal_model)
                             print ('finished evaluating centroid indexing results for crystal model ',crystal_model)
                             # Now index with each each experimental model for each of the unioned observations
@@ -601,7 +600,7 @@ class Processor_iota(Processor):
                                     print ('A-matrix reference=', cryst_tmp_ori.direct_matrix())
                                     #from IPython import embed; embed(); exit()
                                     best_similarity_transform = cryst_tmp_ori.best_similarity_transformation(
-                                      other = cryst_ref_ori, fractional_length_tolerance = 50.00,
+                                      other = cryst_ref_ori, fractional_length_tolerance = 20.00,
                                       unimodular_generator_range=1)
                                     cryst_tmp_ori_best=cryst_tmp_ori.change_basis(best_similarity_transform)
                                     obs.crystals()[0].set_A(cryst_tmp_ori_best.reciprocal_matrix())
@@ -627,6 +626,7 @@ class Processor_iota(Processor):
                                     tmp_counter +=1
 
                                     # find dh = |h_frac - h_centroid|
+                                    # indexed_idxlist is list of indices in indexed_tmp if xyzobs.mm.value is in indexed_centroid
                                     indexed_idxlist = [idx for idx,elem in enumerate(indexed_tmp['xyzobs.mm.value'])
                                                        if elem in indexed_centroid['xyzobs.mm.value']]
                                     dh_list_tmp = flex.double()
@@ -636,6 +636,9 @@ class Processor_iota(Processor):
                                         y = indexed_tmp['fractional_miller_index'][idx]
                                         if indexed_centroid['miller_index'][centroid_list_idx] != indexed_tmp['miller_index'][idx]:
                                             continue
+                                        #if indexed_centroid['xyzobs.mm.value'][centroid_list_idx] != indexed_tmp['xyzobs.mm.value'][idx]:
+                                        #    continue
+                                        #from IPython import embed; embed(); exit()
                                         if indexed_centroid['miller_index'][centroid_list_idx] not in hkl_all_values:
                                             hkl_all_values[indexed_centroid['miller_index'][centroid_list_idx]] = flex.vec3_double()
                                         hkl_all_values[indexed_centroid['miller_index'][centroid_list_idx]].append(y)
@@ -666,8 +669,8 @@ class Processor_iota(Processor):
                                     beam = experiments_centroid.beams()[0]
                                     resolution = panel.get_resolution_at_pixel(beam.get_s0(),refl['xyzobs.px.value'][0:2])
                                     print ('MILLER_INDEX_DH_STATS', refl['miller_index'], ' ',dh,' ',dh_cutoff,' ',resolution)
-                                    #if dh_cutoff > 0.4:
-                                    #    dh_cutoff=0.4
+                                    #if dh_cutoff > 0.3:
+                                    #    dh_cutoff=0.3
 
                                     #self.refine(all_experiments_tmp, all_indexed_tmp)
                                     #from IPython import embed; embed(); exit()
