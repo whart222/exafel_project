@@ -61,6 +61,31 @@ def get_dij_ori(cryst1, cryst2, is_reciprocal=True):
   #print 'difference z-score = ', cryst1_ori.difference_Z_score(cryst2_ori_best)
   return cryst1_ori.difference_Z_score(cryst2_ori_best)
 
+def estimate_d_c(Dij):
+  ''' Estimate the value of d_c using the assumption that each cluster will be gaussian distributed in it's dij values.
+      If we can find out how many of those gaussians are there in the Dij distribution, we can get an estimate of the d_c
+      from the standard deviation of the individual gaussians'''
+  from scitbx.array_family import flex
+  Dij_max=max(Dij.as_1d())
+  Dij_min=min(Dij.as_1d())
+  # Rounding off to closest multiple of 10
+  n_slots=(int(Dij_max)//10+1)*10
+  hist_data=flex.histogram(Dij.as_1d(), n_slots=n_slots)
+  # Divide the data further into bins and see if there are dead zones with data on either sides. 
+  # This will indicate that there are 2+ clusters
+  y=hist_data.slots()
+  x=hist_data.slot_centers()
+  moving_avg_bin=[]
+  for i in range(0, n_slots, 10):
+    moving_avg_bin.append(flex.mean(flex.double(list(y[i:i+10]))))
+  # There has to be one cluster close to 0.0, take that as reference point and find out where the next cluster is
+  min_avg = min(moving_avg_bin)*2.0
+  d_c=10.0
+  for i, avg in enumerate(moving_avg_bin):
+    if avg<=min_avg:
+      d_c= float(i*10.0)
+      break
+  return d_c
 
 class clustering_manager(group_args):
   def __init__(self, **kwargs):
@@ -102,30 +127,49 @@ class clustering_manager(group_args):
 
     significant_delta = []
     significant_rho = []
+    # Define strategy to decide cluster center here. Only one should be true
     debug_fix_clustering = True
+    strategy2=False
     if debug_fix_clustering:
       if not pick_top_solution:
         delta_z_cutoff = min(1.0, max(delta_z))
         rho_z_cutoff = min(1.0, max(rho_z))
         for ic in range(NN):
           # test the density & rho
-          if delta_z[ic] >= delta_z_cutoff:
+          if delta_z[ic] >= delta_z_cutoff or delta_z[ic] <= -delta_z_cutoff:
             significant_delta.append(ic)
-          if rho_z[ic] >= rho_z_cutoff:
+          if rho_z[ic] >= rho_z_cutoff or rho_z[ic] <= -rho_z_cutoff:
             significant_rho.append(ic)
-        centroid_candidates = list(set(significant_delta).intersection(set(significant_rho)))
-        # Now compare the relative orders of the max delta_z and max rho_z to make sure they are within 1 stdev
-        centroids = []
-        max_delta_z_candidates = -999.9
-        max_rho_z_candidates = -999.9
-        for ic in centroid_candidates:
-          if delta_z[ic] > max_delta_z_candidates:
-            max_delta_z_candidates = delta_z[ic]
-          if rho_z[ic] > max_rho_z_candidates:
-            max_rho_z_candidates = rho_z[ic]
-        for ic in centroid_candidates:
-          if max_delta_z_candidates - delta_z[ic] < 1.0 and max_rho_z_candidates - rho_z[ic] < 1.0:
-            centroids.append(ic)
+        if True:
+          # Use idea quoted in Rodriguez Laio 2014 paper
+          # " Thus, cluster centers are recognized as points for which the value of delta is anomalously large."
+          centroid_candidates=list(significant_delta)
+          candidate_delta_z=flex.double()
+          for ic in centroid_candidates:
+            candidate_delta_z.append(delta_z[ic])
+          i_sorted=flex.sort_permutation(candidate_delta_z, reverse=True)
+          centroids=[]
+          # The first one has to be a centroid !!
+          centroids.append(centroid_candidates[i_sorted[0]])
+          for i in range(1, len(i_sorted[:])):
+            if candidate_delta_z[i_sorted[i-1]]-candidate_delta_z[i_sorted[i]] > 1.0:
+              centroids.append(centroid_candidates[i_sorted[i]])
+            else:
+              break
+        if False:
+          centroid_candidates = list(set(significant_delta).intersection(set(significant_rho)))
+          # Now compare the relative orders of the max delta_z and max rho_z to make sure they are within 1 stdev
+          centroids = []
+          max_delta_z_candidates = -999.9
+          max_rho_z_candidates = -999.9
+          for ic in centroid_candidates:
+            if delta_z[ic] > max_delta_z_candidates:
+              max_delta_z_candidates = delta_z[ic]
+            if rho_z[ic] > max_rho_z_candidates:
+              max_rho_z_candidates = rho_z[ic]
+          for ic in centroid_candidates:
+            if max_delta_z_candidates - delta_z[ic] < 1.0 and max_rho_z_candidates - rho_z[ic] < 1.0:
+              centroids.append(ic)
 
       item_idxs = [delta_order[ic] for ic,centroid in enumerate(centroids)]
       for item_idx in item_idxs:
@@ -133,6 +177,20 @@ class clustering_manager(group_args):
         print ('CLUSTERING_STATS',item_idx,cluster_id[item_idx] )
         n_cluster +=1
         ####
+    elif strategy2:
+      # Go through list of clusters, see which one has highest joint rank in both rho and delta lists
+      # This will only assign one cluster center based on highest product of rho and delta ranks
+      product_list_of_ranks=[]
+      for ic in range(NN):
+        rho_tmp=self.rho[ic]
+        delta_tmp=self.delta[ic]
+        product_list_of_ranks.append(rho_tmp*delta_tmp)
+      import numpy as np
+      item_idx=np.argmax(product_list_of_ranks)
+      cluster_id[item_idx]=n_cluster # Only cluster assigned
+      print ('CLUSTERING_STATS',item_idx,cluster_id[item_idx])
+      n_cluster +=1
+    
     else:
       for ic in range(NN):
         item_idx = delta_order[ic]
@@ -151,6 +209,7 @@ class clustering_manager(group_args):
       if cluster_id[x] >= 0:
         print ("XC", x,cluster_id[x], rho[x], delta[x])
     self.cluster_id_maxima = cluster_id.deep_copy()
+    #from IPython import embed; embed(); exit()
     R.cluster_assignment(rho_order, cluster_id)
     self.cluster_id_full = cluster_id.deep_copy()
 
@@ -183,6 +242,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
     return [experiments_list[0].crystals()[0]], None
   cells = []
 
+  #from IPython import embed; embed(); exit()
   from xfel.clustering.singleframe import CellOnlyFrame
   # Flag for testing Lysozyme data from NKS.Make sure cluster_regression repository is present and configured
   # Program will exit after plots are displayed if this flag is true
@@ -242,7 +302,9 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   Dij = NCDist_flatten(MM_double)
   from scitbx.math import five_number_summary
   d_c = clustering_params.d_c #five_number_summary(list(Dij))[1]
-  d_c = flex.mean_and_variance(Dij.as_1d()).unweighted_sample_standard_deviation()
+  d_c = estimate_d_c(Dij)
+  #d_c = flex.mean_and_variance(Dij.as_1d()).unweighted_sample_standard_deviation()
+  print ('d_c = ',d_c)
   if len(cells) < 5:
     return [experiments_list[0].crystals()[0]], None
   CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=clustering_params.max_percentile_rho_uc,Z_delta=clustering_params.Z_delta)
@@ -336,12 +398,14 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
     for cluster in Dij_ori:
       #if cluster == 2:
       #  CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=0.85, debug=True)
+      d_c_ori = estimate_d_c(Dij_ori[cluster])
       #else:
-      d_c_ori=flex.mean_and_variance(Dij_ori[cluster].as_1d()).unweighted_sample_standard_deviation()
+      #d_c_ori=flex.mean_and_variance(Dij_ori[cluster].as_1d()).unweighted_sample_standard_deviation()
+      print ('d_c_ori=',d_c_ori)
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=clustering_params.max_percentile_rho_ori, Z_delta=clustering_params.Z_delta)
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       for i in range(n_cluster_ori):
-        if len([zz for zz in CM.cluster_id_final if zz == i]) < clustering_params.min_datapts:
+        if len([zz for zz in CM_ori.cluster_id_final if zz == i]) < clustering_params.min_datapts:
           continue
         item = flex.first_index(CM_ori.cluster_id_maxima, i)
         dxtbx_crystal_model = uc_experiments_list[cluster][item].crystals()[0]
@@ -359,7 +423,9 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         A_matrices.append(A_direct)
         print ("IOTA: Direct A matrix 1st element of orientational cluster %d  = %12.6f"%(i,A_direct[0]))
         print (A_direct)
+      #from IPython import embed; embed(); exit()
       if show_plot:
+        #from IPython import embed; embed(); exit()
         # Decision graph
         stretch_plot_factor = 1.05 # (1+fraction of limits by which xlim,ylim should be set)
         import matplotlib.pyplot as plt
@@ -376,7 +442,13 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   # FIXME Still to be worked out what exactly should be returned
   #if return_only_first_indexed_model:
   #  return [experiments_list[0].crystals()[0]], clustered_experiments_list
+
+
+
+
+
   if len(dxtbx_crystal_models) > 0:
+    #from IPython import embed; embed(); exit()
     return dxtbx_crystal_models, clustered_experiments_list
   else:
     # If nothing works, atleast return the 1st crystal model that was found
