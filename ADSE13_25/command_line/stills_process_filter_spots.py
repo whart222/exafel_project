@@ -4,6 +4,7 @@ from six.moves import range
 import logging
 import os
 import math
+import collections
 
 from dxtbx.model.experiment_list import ExperimentListFactory
 from dxtbx.model.experiment_list import ExperimentList
@@ -65,7 +66,7 @@ iota {
     min_indexed_spots = 7
       .type = int
       .help = minimum number of spots that should be indexed on an image by a model
-    align_calc_spots_with_obs = True
+    align_calc_spots_with_obs = False
       .type = bool
       .help = if True, adjusts detector distance to try minimize rcalc-robs for unrefined indexing \
               results.
@@ -524,6 +525,7 @@ class Processor_iota(Processor):
                         all_indexed_tmp = flex.reflection_table()
                         all_experiments_tmp = ExperimentList()
                         tmp_counter = 0
+                        unrefined_experiments=ExperimentList()
                         for crystal_model in sample:
                             # Need to have a minimum number of experiments for correct stats
                             # FIXME number should not be hardcoded. ideally a phil param
@@ -585,6 +587,7 @@ class Processor_iota(Processor):
                             dh_list = flex.double()
                             failed_model_counter = 0
                             hkl_all_values = {}
+                            print ('Now looping over all the cluster members and calculating fractional HKLs for the union set')
                             for obs in all_experimental_models[crystal_model]:
                                 try:
                                     #import pdb; pdb.set_trace()
@@ -647,6 +650,7 @@ class Processor_iota(Processor):
                                 except Exception as e:
                                     print ('Reindexing with candidate lattices on union set failed', str(e))
                             # Get a sense of the variability in dh. Assign Z-score cutoff from there
+                            #from IPython import embed; embed(); exit()
                             try:
                                 #from IPython import embed; embed(); exit()
                                 Z_cutoff = self.params.iota.random_sub_sampling.Z_cutoff
@@ -654,24 +658,44 @@ class Processor_iota(Processor):
                                 indexed_spots_idx = []
                                 print ('MILLER_INDEX_DH_STATS', ' (H, K, L)', ' ', ' delta_H ','     ','delta_H_cutoff','   ','resolution')
                                 for ii,refl in enumerate(indexed_centroid):
+                                    refl_ensemble=all_indexed_tmp.select(all_indexed_tmp['xyzobs.mm.value'].is_equal_to_vec3_double(refl['xyzobs.mm.value']))
+                                    # First ensure that the miller_index of the centroid is the majority in the refl_ensemble
+                                    hkl_count=collections.Counter(refl_ensemble['miller_index']).items()
+                                    max_hkl_count=-999
+                                    max_hkl=[]
+                                    for i, i_entry in enumerate(hkl_count):
+                                        hkl, count = i_entry 
+                                        if count >= max_hkl_count:
+                                            max_hkl_count=count
+                                            max_hkl.append(hkl)
+                                    # Imposing logic here that the centroid hkl value should represent the majority. If not, print the majority and ignore for now
+                                    # The ensemble value could be used to fix misindexing ?
+                                    if refl['miller_index'] not in max_hkl:
+                                        print ('Miller index of centroid is not majority for this spot. Moving to next spot ')
+                                        continue
+                                    print ('Centroid HKL is the majority in cluster. It has %s entries in the ensemble out of %s'%(max_hkl_count, len(refl_ensemble)))
+                                    # Now choose those trials/crystals which predicted the same hkl as the centroid
+                                    refl_sameHKL_ensemble=refl_ensemble.select(refl_ensemble['miller_index']==refl['miller_index'])
                                     dh = flex.double([refl['miller_index'][0]-refl['fractional_miller_index'][0],
                                                   refl['miller_index'][1]-refl['fractional_miller_index'][1],
                                                   refl['miller_index'][2]-refl['fractional_miller_index'][2]]).norm()
-                                    hfrac,kfrac,lfrac = hkl_all_values[refl['miller_index']].parts()
+                                    hfrac,kfrac,lfrac = refl_sameHKL_ensemble['fractional_miller_index'].parts()
                                     # FIXME arbitrary cutoff: if not enough datapoints, cant do a statistical analysis
                                     if len(list(hfrac)) < 3:
                                         continue
                                     dh_cutoff = hfrac.sample_standard_deviation()*hfrac.sample_standard_deviation()+ \
                                                 kfrac.sample_standard_deviation()*kfrac.sample_standard_deviation()+ \
                                                 lfrac.sample_standard_deviation()*lfrac.sample_standard_deviation()
+                                    dh_cutoff_noZ = math.sqrt(dh_cutoff)
                                     dh_cutoff = math.sqrt(dh_cutoff)*Z_cutoff
                                     panel = experiments_centroid.detectors()[0][0]
                                     beam = experiments_centroid.beams()[0]
                                     resolution = panel.get_resolution_at_pixel(beam.get_s0(),refl['xyzobs.px.value'][0:2])
                                     print ('MILLER_INDEX_DH_STATS', refl['miller_index'], ' ',dh,' ',dh_cutoff,' ',resolution)
-                                    #if dh_cutoff > 0.3:
-                                    #    dh_cutoff=0.3
-
+                                    # Not sure if there is any point comparing dh with dh_cutoff if the dh_cutoff is too high
+                                    if dh > 0.5:
+                                        #from IPython import embed; embed(); exit()
+                                        continue
                                     #self.refine(all_experiments_tmp, all_indexed_tmp)
                                     #from IPython import embed; embed(); exit()
                                     #print ('DH = %12.7f and CUTOFF = %12.7f'%(dh, dh_cutoff))
@@ -682,7 +706,6 @@ class Processor_iota(Processor):
                                 if len(indexed_centroid.select(flex.size_t(indexed_spots_idx))) > self.params.iota.random_sub_sampling.min_indexed_spots:
                                     indexed.extend(indexed_centroid.select(flex.size_t(indexed_spots_idx)))
                                     # Need to append properly
-                                    unrefined_experiments=ExperimentList()
                                     for iexpt,expt in enumerate(experiments_centroid):
                                         print ('APPENDING EXPERIMENT = ',crystal_model,iexpt)
                                         # If detector was moved to align calculated spots with observed then
@@ -695,7 +718,13 @@ class Processor_iota(Processor):
 
                             except Exception as e:
                                 print ('dh_list calculation and outlier rejection failed',str(e))
-
+                        # Ensure that no miller_index is assigned to multiple spots
+                        # Chuck all of them out if so
+                        assigned_hkl=collections.Counter(indexed['miller_index']).items()
+                        for i, item in enumerate(assigned_hkl):
+                            hkl, count=item
+                            if count > 1:
+                                indexed.del_selected(indexed['miller_index']==hkl)
                         # Make sure crytal model numbers are in sequence, example 0,1,2 instead of 0,2,3
                         # when model 1 was not used for consensus part. Otherwise refine won't work
                         max_id = flex.max(indexed['id'])
