@@ -146,14 +146,26 @@ class clustering_manager(group_args):
           centroid_candidates=list(significant_delta)
           candidate_delta_z=flex.double()
           for ic in centroid_candidates:
+            if ic == rho_order[0]:
+              delta_z_of_rho_order_0=delta_z[ic]
             candidate_delta_z.append(delta_z[ic])
           i_sorted=flex.sort_permutation(candidate_delta_z, reverse=True)
+          # Check that once sorted the top one is not equal to the 2nd or 3rd position
+          # If there is a tie, assign centroid to the first one in rho order
           centroids=[]
-          # The first one has to be a centroid !!
-          centroids.append(centroid_candidates[i_sorted[0]])
-          for i in range(1, len(i_sorted[:])):
-            if candidate_delta_z[i_sorted[i-1]]-candidate_delta_z[i_sorted[i]] > 1.0:
-              centroids.append(centroid_candidates[i_sorted[i]])
+          # rho_order[0] has to be a centroid
+          centroids.append(rho_order[0])
+          
+          #centroids.append(centroid_candidates[i_sorted[0]])
+          for i in range(0, len(i_sorted[:])):
+            if centroid_candidates[i_sorted[i]] == rho_order[0]:
+              continue
+            if delta_z_of_rho_order_0-candidate_delta_z[i_sorted[i]] > 1.0:
+              if i>1:
+                if candidate_delta_z[i_sorted[i-1]]-candidate_delta_z[i_sorted[0]] > 1.0:
+                  centroids.append(centroid_candidates[i_sorted[i]])
+              else:
+                centroids.append(centroid_candidates[i_sorted[i]])
             else:
               break
         if False:
@@ -171,7 +183,8 @@ class clustering_manager(group_args):
             if max_delta_z_candidates - delta_z[ic] < 1.0 and max_rho_z_candidates - rho_z[ic] < 1.0:
               centroids.append(ic)
 
-      item_idxs = [delta_order[ic] for ic,centroid in enumerate(centroids)]
+      #item_idxs = [delta_order[ic] for ic,centroid in enumerate(centroids)]
+      item_idxs=centroids
       for item_idx in item_idxs:
         cluster_id[item_idx] = n_cluster
         print ('CLUSTERING_STATS',item_idx,cluster_id[item_idx] )
