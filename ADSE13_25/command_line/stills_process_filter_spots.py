@@ -600,7 +600,7 @@ class Processor_iota(Processor):
                                     cryst_ref_ori = crystal_orientation(explist_centroid.crystals()[0].get_A(), True)
                                     cryst_tmp_ori = crystal_orientation(obs.crystals()[0].get_A(), True)
                                     #print ('A-matrix reference=', cryst_ref_ori.direct_matrix())
-                                    print ('A-matrix reference=', cryst_tmp_ori.direct_matrix())
+                                    #print ('A-matrix reference=', cryst_tmp_ori.direct_matrix())
                                     #from IPython import embed; embed(); exit()
                                     best_similarity_transform = cryst_tmp_ori.best_similarity_transformation(
                                       other = cryst_ref_ori, fractional_length_tolerance = 20.00,
@@ -660,18 +660,21 @@ class Processor_iota(Processor):
                                 for ii,refl in enumerate(indexed_centroid):
                                     refl_ensemble=all_indexed_tmp.select(all_indexed_tmp['xyzobs.mm.value'].is_equal_to_vec3_double(refl['xyzobs.mm.value']))
                                     # First ensure that the miller_index of the centroid is the majority in the refl_ensemble
-                                    hkl_count=collections.Counter(refl_ensemble['miller_index']).items()
-                                    max_hkl_count=-999
+                                    #import pdb; pdb.set_trace()
+                                    hkl_stats=collections.Counter(refl_ensemble['miller_index'])
+                                    hkl_count=list(hkl_stats.viewvalues())
+                                    hkl_indexes=list(hkl_stats.viewkeys())
+                                    max_hkl_count=max(hkl_count)
                                     max_hkl=[]
-                                    for i, i_entry in enumerate(hkl_count):
-                                        hkl, count = i_entry 
-                                        if count >= max_hkl_count:
-                                            max_hkl_count=count
+                                    
+                                    for i_count, count in enumerate(hkl_count):
+                                        hkl=hkl_indexes[i_count]
+                                        if count == max_hkl_count:
                                             max_hkl.append(hkl)
                                     # Imposing logic here that the centroid hkl value should represent the majority. If not, print the majority and ignore for now
                                     # The ensemble value could be used to fix misindexing ?
                                     if refl['miller_index'] not in max_hkl:
-                                        print ('Miller index of centroid is not majority for this spot. Moving to next spot ')
+                                        print ('Miller index %s of centroid is not majority for this spot. Moving to next spot. Majority HKL is %s'%(refl['miller_index'], max_hkl))
                                         continue
                                     print ('Centroid HKL is the majority in cluster. It has %s entries in the ensemble out of %s'%(max_hkl_count, len(refl_ensemble)))
                                     # Now choose those trials/crystals which predicted the same hkl as the centroid
@@ -682,6 +685,8 @@ class Processor_iota(Processor):
                                     hfrac,kfrac,lfrac = refl_sameHKL_ensemble['fractional_miller_index'].parts()
                                     # FIXME arbitrary cutoff: if not enough datapoints, cant do a statistical analysis
                                     if len(list(hfrac)) < 3:
+                                        #from IPython import embed; embed(); exit()
+                                        print ('NOT_ENOUGH_STATS=',refl['miller_index'],dh)
                                         continue
                                     dh_cutoff = hfrac.sample_standard_deviation()*hfrac.sample_standard_deviation()+ \
                                                 kfrac.sample_standard_deviation()*kfrac.sample_standard_deviation()+ \
@@ -700,6 +705,7 @@ class Processor_iota(Processor):
                                     #from IPython import embed; embed(); exit()
                                     #print ('DH = %12.7f and CUTOFF = %12.7f'%(dh, dh_cutoff))
                                     if dh < dh_cutoff and refl['miller_index'] != (0,0,0):
+                                    #if dh_cutoff < 0.3 and refl['miller_index'] != (0,0,0):
                                         indexed_spots_idx.append(ii)
                                 # Make sure the number of spots indexed by a model is above a threshold
                                 #import pdb; pdb.set_trace()
