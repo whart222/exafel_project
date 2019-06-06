@@ -70,6 +70,8 @@ def estimate_d_c(Dij):
   Dij_min=min(Dij.as_1d())
   # Rounding off to closest multiple of 10
   n_slots=(int(Dij_max)//10+1)*10
+  if n_slots == 10:
+    return 1.0
   hist_data=flex.histogram(Dij.as_1d(), n_slots=n_slots)
   # Divide the data further into bins and see if there are dead zones with data on either sides. 
   # This will indicate that there are 2+ clusters
@@ -83,7 +85,7 @@ def estimate_d_c(Dij):
   d_c=10.0
   for i, avg in enumerate(moving_avg_bin):
     if avg<=min_avg:
-      d_c= float(i*10.0)
+      d_c= float(i*10.0)+1.0
       break
   return d_c
 
@@ -95,6 +97,8 @@ class clustering_manager(group_args):
     R = RL(distance_matrix = self.Dij, d_c = self.d_c)
     #from clustering.plot_with_dimensional_embedding import plot_with_dimensional_embedding
     #plot_with_dimensional_embedding(1-self.Dij/flex.max(self.Dij), show_plot=True)
+    if hasattr(self, 'strategy') is False:
+      self.strategy='default'
     self.rho = rho = R.get_rho()
     ave_rho = flex.mean(rho.as_double())
     NN = self.Dij.focus()[0]
@@ -129,7 +133,9 @@ class clustering_manager(group_args):
     significant_rho = []
     # Define strategy to decide cluster center here. Only one should be true
     debug_fix_clustering = True
-    strategy2=False
+    if self.strategy=='one_cluster':
+        debug_fix_clustering=False
+        strategy2=True
     if debug_fix_clustering:
       if not pick_top_solution:
         delta_z_cutoff = min(1.0, max(delta_z))
@@ -223,7 +229,7 @@ class clustering_manager(group_args):
         print ("XC", x,cluster_id[x], rho[x], delta[x])
     self.cluster_id_maxima = cluster_id.deep_copy()
     #from IPython import embed; embed(); exit()
-    R.cluster_assignment(rho_order, cluster_id)
+    R.cluster_assignment(rho_order, cluster_id, rho)
     self.cluster_id_full = cluster_id.deep_copy()
 
     #halo = flex.bool(NN,False)
@@ -277,7 +283,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       crystal_symmetry = crystal.symmetry(unit_cell = unit_cell, space_group_symbol = space_group_symbol)
       cells.append(CellOnlyFrame(crystal_symmetry))
   else:
-    clustered_experiments_list = []
+    clustered_experiments_list = flex.int()
     for experiment in experiments_list:
       if len(experiment.crystals()) >1: print ('IOTA:Should have only one crystal model')
       crystal_symmetry = experiment.crystals()[0].get_crystal_symmetry()
@@ -396,7 +402,6 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       Dij_ori[cluster] = flex.double([[0.0]*uc_cluster_count[cluster]]*uc_cluster_count[cluster])
     # Now populate the Dij_ori array
       N_samples_in_cluster = len(uc_experiments_list[cluster])
-      #from IPython import embed; embed();
       for i in range(N_samples_in_cluster-1):
         for j in range(i+1, N_samples_in_cluster):
           dij_ori = get_dij_ori(uc_experiments_list[cluster][i].crystals()[0],uc_experiments_list[cluster][j].crystals()[0])
@@ -455,14 +460,57 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   # FIXME Still to be worked out what exactly should be returned
   #if return_only_first_indexed_model:
   #  return [experiments_list[0].crystals()[0]], clustered_experiments_list
+  # Make sure the crystal models are not too close to each other
+  # FIXME should be a PHIL
+  min_angle = 5.0 # taken from indexer.py
+  close_models_list = []
+  # Not used really; other fixes have been made to code to figure out outliers
+  # Still keeping this in case it it useful later on. 
+  if len(dxtbx_crystal_models) > 10000:
+    from dials.algorithms.indexing.compare_orientation_matrices import difference_rotation_matrix_axis_angle
+    from cctbx_orientation_ext import crystal_orientation
+    from dxtbx.model import Crystal
+    for i_a in range(0,len(dxtbx_crystal_models)-1):
+      for i_b in range(i_a+1,len(dxtbx_crystal_models)):
+        cryst_a = dxtbx_crystal_models[i_a]
+        cryst_b = dxtbx_crystal_models[i_b]
+        cryst_a_ori = crystal_orientation(cryst_a.get_A(), True)
+        cryst_b_ori = crystal_orientation(cryst_b.get_A(), True)
+        try:
+          best_similarity_transform = cryst_b_ori.best_similarity_transformation(
+            other = cryst_a_ori, fractional_length_tolerance = 20.00,
+            unimodular_generator_range=1)
+          cryst_b_ori_best=cryst_b_ori.change_basis(best_similarity_transform)
+        except Exception as e:
+          cryst_b_ori_best = cryst_b_ori
 
+        # FIXME hardcoded space group for myoglobin LS49
+        cryst_b_best=Crystal(cryst_b_ori_best.direct_matrix()[0:3], cryst_b_ori_best.direct_matrix()[3:6], cryst_b_ori_best.direct_matrix()[6:9], 'P 1 21 1')
+        R_ab, axis, angle, cb_op_ab = difference_rotation_matrix_axis_angle(cryst_a, cryst_b_best)
+        # FIXME
+        #from IPython import embed; embed(); exit()
+        if abs(angle) < min_angle: # degrees
+          close_models_list.append((i_a, i_b))
 
+  # Now prune the dxtbx_crystal_models list
+    unique_experiments_list=flex.int(range(len(dxtbx_crystal_models)))
+    for close_models in close_models_list:
+      i_a,i_b = close_models
+      if dxtbx_crystal_models[i_a] is not None and dxtbx_crystal_models[i_b] is not None:
+        dxtbx_crystal_models[i_b]=None
+        unique_experiments_list[i_b]=i_a
+        clustered_experiments_list.set_selected(clustered_experiments_list==i_b, i_a)
 
-
+    counter=-1
+    for ii,model in enumerate(dxtbx_crystal_models):
+      if model is not None:
+        counter +=1 
+        clustered_experiments_list.set_selected(clustered_experiments_list==unique_experiments_list[ii], counter)
+    dxtbx_crystal_models=[x for x in dxtbx_crystal_models if x is not None]
 
   if len(dxtbx_crystal_models) > 0:
     #from IPython import embed; embed(); exit()
-    return dxtbx_crystal_models, clustered_experiments_list
+    return dxtbx_crystal_models, list(clustered_experiments_list)
   else:
     # If nothing works, atleast return the 1st crystal model that was found
     return [experiments_list[0].crystals()[0]], None
