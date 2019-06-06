@@ -14,6 +14,7 @@ from libtbx.utils import Sorry
 from dials.algorithms.indexing.indexer import indexer_base
 from dials.algorithms.indexing.known_orientation import indexer_known_orientation
 from dials.algorithms.indexing.real_space_grid_search import indexer_real_space_grid_search
+from exafel_project.ADSE13_25.indexing.real_space_grid_smart_search import indexer_real_space_grid_smart_search
 from dials.algorithms.indexing.fft3d import indexer_fft3d
 from dials.algorithms.indexing.fft1d import indexer_fft1d
 from dials_algorithms_indexing_ext import *
@@ -142,6 +143,8 @@ class iota_indexer(stills_indexer):
       idxr = iota_indexer_fft1d(reflections, experiments, params=params)
     elif params.indexing.method == "real_space_grid_search":
       idxr = iota_indexer_real_space_grid_search(reflections, experiments, params=params)
+    elif params.indexing.method == "real_space_grid_smart_search":
+      idxr = iota_indexer_real_space_grid_smart_search(reflections, experiments, params=params)
     return idxr
 
   def index(self, provided_experiments=None,debug=False):
@@ -325,6 +328,10 @@ class iota_indexer_fft1d(iota_indexer, indexer_fft1d):
 
 class iota_indexer_real_space_grid_search(iota_indexer, indexer_real_space_grid_search):
   '''Mixin class with real_space_grid_search and iota_indexer way of identifying indexing solutions'''
+  pass
+
+class iota_indexer_real_space_grid_smart_search(iota_indexer, indexer_real_space_grid_smart_search):
+  '''Mixin class with real_space_grid_smart_search and iota_indexer way of identifying indexing solutions'''
   pass
 
 class iota_indexer_fft3d(iota_indexer, indexer_fft3d):
