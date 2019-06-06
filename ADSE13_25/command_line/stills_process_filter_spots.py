@@ -444,7 +444,7 @@ class Processor_iota(Processor):
                     debug_mode=self.params.iota.random_sub_sampling.debug_mode
                     load_pickle_flag=self.params.iota.random_sub_sampling.load_pickle_flag
                     for trial in range(self.params.iota.random_sub_sampling.ntrials):
-                        if not debug_mode:
+                        if not debug_mode and load_pickle_flag:
                             continue
                         flex.set_random_seed(trial+1001)
                         observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
@@ -526,6 +526,8 @@ class Processor_iota(Processor):
                         all_experiments_tmp = ExperimentList()
                         tmp_counter = 0
                         unrefined_experiments=ExperimentList()
+                        all_dh_cutoffs=[]
+                        all_dh=[]
                         for crystal_model in sample:
                             # Need to have a minimum number of experiments for correct stats
                             # FIXME number should not be hardcoded. ideally a phil param
@@ -658,6 +660,7 @@ class Processor_iota(Processor):
                                 indexed_spots_idx = []
                                 print ('MILLER_INDEX_DH_STATS', ' (H, K, L)', ' ', ' delta_H ','     ','delta_H_cutoff','   ','resolution')
                                 for ii,refl in enumerate(indexed_centroid):
+                                    print ('MOMENT_OF_TRUTH_',ii)
                                     refl_ensemble=all_indexed_tmp.select(all_indexed_tmp['xyzobs.mm.value'].is_equal_to_vec3_double(refl['xyzobs.mm.value']))
                                     # First ensure that the miller_index of the centroid is the majority in the refl_ensemble
                                     #import pdb; pdb.set_trace()
@@ -674,7 +677,7 @@ class Processor_iota(Processor):
                                     # Imposing logic here that the centroid hkl value should represent the majority. If not, print the majority and ignore for now
                                     # The ensemble value could be used to fix misindexing ?
                                     if refl['miller_index'] not in max_hkl:
-                                        print ('Miller index %s of centroid is not majority for this spot. Moving to next spot. Majority HKL is %s'%(refl['miller_index'], max_hkl))
+                                        print ('Miller index %s of centroid is not majority for this spot. Majority HKL is %s'%(refl['miller_index'], max_hkl))
                                         continue
                                     print ('Centroid HKL is the majority in cluster. It has %s entries in the ensemble out of %s'%(max_hkl_count, len(refl_ensemble)))
                                     # Now choose those trials/crystals which predicted the same hkl as the centroid
@@ -684,31 +687,33 @@ class Processor_iota(Processor):
                                                   refl['miller_index'][2]-refl['fractional_miller_index'][2]]).norm()
                                     hfrac,kfrac,lfrac = refl_sameHKL_ensemble['fractional_miller_index'].parts()
                                     # FIXME arbitrary cutoff: if not enough datapoints, cant do a statistical analysis
-                                    if len(list(hfrac)) < 3:
+                                    if len(list(hfrac)) < 10:
                                         #from IPython import embed; embed(); exit()
                                         print ('NOT_ENOUGH_STATS=',refl['miller_index'],dh)
                                         continue
+                                    # Trying an idea of using hfrac-h0 standard deviation as dh_cutoff
                                     dh_cutoff = hfrac.sample_standard_deviation()*hfrac.sample_standard_deviation()+ \
                                                 kfrac.sample_standard_deviation()*kfrac.sample_standard_deviation()+ \
                                                 lfrac.sample_standard_deviation()*lfrac.sample_standard_deviation()
                                     dh_cutoff_noZ = math.sqrt(dh_cutoff)
                                     dh_cutoff = math.sqrt(dh_cutoff)*Z_cutoff
+                                    #all_dh_cutoffs.append(dh_cutoff)
+                                    #all_dh.append(dh)
                                     panel = experiments_centroid.detectors()[0][0]
                                     beam = experiments_centroid.beams()[0]
                                     resolution = panel.get_resolution_at_pixel(beam.get_s0(),refl['xyzobs.px.value'][0:2])
                                     print ('MILLER_INDEX_DH_STATS', refl['miller_index'], ' ',dh,' ',dh_cutoff,' ',resolution)
                                     # Not sure if there is any point comparing dh with dh_cutoff if the dh_cutoff is too high
                                     if dh > 0.5:
-                                        #from IPython import embed; embed(); exit()
+                                        continue
+                                    if dh_cutoff > 0.5:
                                         continue
                                     #self.refine(all_experiments_tmp, all_indexed_tmp)
                                     #from IPython import embed; embed(); exit()
                                     #print ('DH = %12.7f and CUTOFF = %12.7f'%(dh, dh_cutoff))
                                     if dh < dh_cutoff and refl['miller_index'] != (0,0,0):
-                                    #if dh_cutoff < 0.3 and refl['miller_index'] != (0,0,0):
                                         indexed_spots_idx.append(ii)
                                 # Make sure the number of spots indexed by a model is above a threshold
-                                #import pdb; pdb.set_trace()
                                 if len(indexed_centroid.select(flex.size_t(indexed_spots_idx))) > self.params.iota.random_sub_sampling.min_indexed_spots:
                                     indexed.extend(indexed_centroid.select(flex.size_t(indexed_spots_idx)))
                                     # Need to append properly
@@ -741,16 +746,29 @@ class Processor_iota(Processor):
 
                         for ii,iid in enumerate(original_ids):
                             indexed['id'].set_selected(indexed['id'] == iid,ii)
-                        # Set back whatever PHIL parameter was supplied by user for outlier rejection and refinement
-                        # Forcing to be true. Should be reverted
                         # FIXME
-                        self.params.indexing.stills.candidate_outlier_rejection=True #outlier_rejection_flag
+                        # Attempt to do an outlier rejection based on RMSD values at the end
+                        if False:
+                            diff_px=indexed['xyzobs.px.value']-indexed['xyzcal.px']
+                            rms=diff_px.norms()
+                            sorted_iid=flex.sort_permutation(rms)
+                            sorted_rms=flex.sorted(rms)
+                            outliers=flex.bool(len(rms), False)
+                            for ii, deviation in enumerate(sorted_iid):
+                                if ii==0: continue
+                                rmsd=sorted_rms[0:ii].norm()/(math.sqrt(ii))
+                                if rmsd > 4.0:
+                                    for jj in range(0,ii+1):
+                                        outliers[sorted_iid[jj]]=True
+                                    break
+                            indexed=indexed.select(outliers) 
+                        # Forcing outlier rejection to be False and refine_all_candidates to be True
+                        # Logic is IOTA does its own outlier rejection through dh_cutoff but needs a refinement step at the end
+                        self.params.indexing.stills.candidate_outlier_rejection=False #outlier_rejection_flag
                         self.params.indexing.stills.refine_all_candidates=True #refine_all_candidates_flag
-                        # Perform refinement and outlier rejection
-                        #import pdb; pdb.set_trace()
+                        # Perform refinement and outlier rejection depending on what flags are turned on
                         from exafel_project.ADSE13_25.refinement.iota_refiner import iota_refiner
                         refiner=iota_refiner(indexed, unrefined_experiments, self.params)
-                        #from IPython import embed; embed(); exit()
                         experiments,indexed = refiner.run_refinement_and_outlier_rejection()
                     try:
                         print ('REFINEINGNONE')
