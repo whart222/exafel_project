@@ -77,6 +77,11 @@ iota {
     load_pickle_flag = True
       .type = bool
       .help = If enabled, it will load dumped json/pickle of an IOTA trial and proceed with clustering and refinement 
+    ts_to_load = None
+      .type = str
+      .help = name of tag to load up for debugging. These will be dumped ensemble experiments/observed lists\
+              These will be on disk in the form tag_ensemble_exp_list.pickle and tag_ensemble_obs_list.pickle \
+              Will only be used if load_pickle_flag is turned on
 
   }
   include scope exafel_project.ADSE13_25.clustering.consensus_functions.clustering_iota_scope
@@ -468,6 +473,12 @@ class Processor_iota(Processor):
                         except Exception as e:
                             print('Indexing failed for some reason', str(e))
                     from libtbx.easy_pickle import dump,load
+                    if True:
+                        import copy
+                        copy_of_experiments_list=copy.deepcopy(experiments_list)
+                        copy_of_observed_samples_list=copy.deepcopy(observed_samples_list)
+                        #dump('experiments_list.pickle', experiments_list)
+                        #dump('observed_samples_list.pickle', observed_samples_list)
                     if debug_mode:
                         dump('experiments_list.pickle', experiments_list)
                         dump('observed_samples_list.pickle', observed_samples_list)
@@ -481,8 +492,13 @@ class Processor_iota(Processor):
                         exit()
                     #from libtbx.easy_pickle import load
                     if not debug_mode and load_pickle_flag:
-                        experiments_list = load('experiments_list.pickle')
-                        observed_samples_list = load('observed_samples_list.pickle')
+                        tag=self.params.iota.random_sub_sampling.ts_to_load
+                        if tag is None:
+                            experiments_list = load('experiments_list.pickle')
+                            observed_samples_list = load('observed_samples_list.pickle')
+                        else:
+                            experiments_list = load(tag+'_ensemble_exp_list.pickle')
+                            observed_samples_list = load(tag+'_ensemble_obs_list.pickle')
                     # Dump out json file and pickle file of the indexed reflections as separate ids
                     if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
                         if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
@@ -768,10 +784,34 @@ class Processor_iota(Processor):
                         self.params.indexing.stills.refine_all_candidates=True #refine_all_candidates_flag
                         # Perform refinement and outlier rejection depending on what flags are turned on
                         from exafel_project.ADSE13_25.refinement.iota_refiner import iota_refiner
-                        refiner=iota_refiner(indexed, unrefined_experiments, self.params)
-                        experiments,indexed = refiner.run_refinement_and_outlier_rejection()
+                        refine_in_iterations=False
+                        if refine_in_iterations:
+                            while True:
+                                print ('Refining in iterations rejecting one highest RMS spot at a time')
+                                refiner=iota_refiner(indexed, unrefined_experiments, self.params)
+                                unrefined_experiments, indexed=refiner.run_refinement_and_outlier_rejection()
+                                diff_px=indexed['xyzobs.px.value']-indexed['xyzcal.px']
+                                if diff_px.norm()/math.sqrt(len(diff_px)) < 2.0:
+                                    experiments=unrefined_experiments
+                                    break
+                                if len(indexed) <= self.params.iota.random_sub_sampling.min_indexed_spots:
+                                    experiments=unrefined_experiments
+                                    break
+                                rms=diff_px.norms()
+                                sorted_iid=flex.sort_permutation(rms, reverse=True)
+                                outliers=flex.bool(len(rms), False)
+                                outliers[sorted_iid[0]]=True
+                                indexed.del_selected(outliers)
+                        else:
+                            refiner=iota_refiner(indexed, unrefined_experiments, self.params)
+                            experiments,indexed = refiner.run_refinement_and_outlier_rejection()
                     try:
                         print ('REFINEINGNONE')
+                        # DUmp the ensemble indexing solutions for debugging in case
+                        if not load_pickle_flag and self.tag is not None:
+                            #from IPython import embed; embed(); exit()
+                            dump(self.tag+'_ensemble_exp_list.pickle', copy_of_experiments_list)
+                            dump(self.tag+'_ensemble_obs_list.pickle', copy_of_observed_samples_list)
                         experiments,indexed = self.refine(experiments, indexed)
                     except Exception as e:
                         print("Error refining", tag, str(e))
