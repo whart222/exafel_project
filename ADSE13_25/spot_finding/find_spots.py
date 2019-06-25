@@ -3,8 +3,9 @@ from __future__ import absolute_import, division, print_function
 import logging
 import os
 logger = logging.getLogger('exafel.find_spots')
-from dxtbx.model.experiment_list import ExperimentListFactory
-from dxtbx.model.experiment_list import ExperimentList
+from dxtbx.model.experiment_list import ExperimentListFactory, ExperimentList, ExperimentListDumper
+from dials.algorithms.spot_prediction import StillsReflectionPredictor
+from dials.array_family import flex
 from libtbx.utils import Abort, Sorry
 from libtbx.phil import parse
 
@@ -12,7 +13,29 @@ from libtbx.phil import parse
 # Imports for LS49
 from dials.command_line.stills_process import Script, Processor, control_phil_str, dials_phil_str, program_defaults_phil_str
 
-phil_scope = parse(control_phil_str + dials_phil_str, process_includes=True).fetch(parse(program_defaults_phil_str))
+LS49_phil_str = """
+LS49 {
+  dump_CBF = False
+    .type = bool
+    .help = if True, then dumps images as CBFs. Can specificy a list of timestamps to dump
+  predict_spots = False
+    .type = bool
+    .help = If False, only do spotfinding. Ideally used for Jungfrau XTC data. If True, also does downstream analysis \
+            like spot prediction using crystal model indexed on rayonix.
+  path_to_rayonix_crystal_models = None
+    .type = str
+    .help = path to crystal models that were indexed using the rayonix data.Should only be a path \
+            Eg. /my/path/to/rayonix_models/ \
+            Where the folder contains all the integrated_experiments.json files from the rayonix analysis \
+            Note that this option should be provided if predict_spots is True 
+  path_to_jungfrau_detector_model = None
+    .type = str
+    .help = path to jungfrau detector models that were indexed. Should be path to the experiment file including the file itself\
+            Eg. /my/path/to/jungfrau_model/experiment.json \
+            Note that this option should be provided if predict_spots is True
+}
+"""
+phil_scope = parse(control_phil_str + dials_phil_str + LS49_phil_str, process_includes=True).fetch(parse(program_defaults_phil_str))
 
 
 message = ''' This is a specialized version of stills_process which only does spot_finding. Difference is it only
@@ -47,6 +70,22 @@ def do_import(filename, load_models=True):
     return experiments
 
 class SpotFinding_Script(Script):
+    def __init__(self):
+        """Initialise the script."""
+        from dials.util.options import OptionParser
+        import libtbx.load_env
+
+        # The script usage
+        usage = (
+            "usage: %s [options] [param.phil] filenames" % libtbx.env.dispatcher_name
+        )
+
+        self.tag = None
+        self.reference_detector = None
+
+        # Create the parser
+        self.parser = OptionParser(usage=usage, phil=phil_scope, epilog="")
+
     def run(self):
         """Execute the script."""
         from dials.util import log
@@ -139,10 +178,19 @@ class SpotFinding_Script(Script):
                 else:
                     tags.append(basename)
 
-
             # Wrapper function
             def do_work(i, item_list):
                 processor = SpotFinding_Processor(copy.deepcopy(params), composite_tag = "%04d"%i, rank = i)
+                if params.LS49.dump_CBF:
+                    print ('READING IN TIMESTAMPS TO DUMP')
+                    # Read in file with timestamps information
+                    processor.timestamps_to_dump = []
+                    with open(os.path.join(self.params.output.output_dir,'../timestamps_to_dump.dat'), 'r') as fin:
+                        for line in fin:
+                            if line !='\n':
+                                ts = line.split()[0].strip()
+                                processor.timestamps_to_dump.append(ts)
+
                 from dials.array_family import flex
                 all_spots_from_rank = flex.reflection_table()
                 for item in item_list:
@@ -206,6 +254,7 @@ class SpotFinding_Script(Script):
             all_spots_from_rank = do_work(rank, subset)
             all_spots_rank0 = comm.gather(all_spots_from_rank, root=0)
             print ('IOTA_ALL_SPOTS_RANKS_1')
+            exit()
             if rank == 0:
                 from dials.array_family import flex
                 all_spots = flex.reflection_table()
@@ -213,10 +262,10 @@ class SpotFinding_Script(Script):
                     if refl_table is not None:
                         all_spots.extend(refl_table)
                 from libtbx.easy_pickle import dump
-                dump('all_spots.pickle', all_spots_rank0)
-                dump('all_experiments.pickle', experiments)
-                print ('IOTA_ALL_SPOTS_RANKS_2')
-                print ('IOTA_ALL_SPOTS_RANKS_3')
+                #dump('all_spots.pickle', all_spots_rank0)
+                #dump('all_experiments.pickle', experiments)
+                #print ('IOTA_ALL_SPOTS_RANKS_2')
+                #print ('IOTA_ALL_SPOTS_RANKS_3')
                 from dials.algorithms.spot_finding import per_image_analysis
                 from six.moves import cStringIO as StringIO
                 s = StringIO()
@@ -258,14 +307,87 @@ class SpotFinding_Processor(Processor):
 #      dump = DataBlockDumper(datablock)
 #      dump.as_json(self.params.output.datablock_filename)
 
+
+        try:
+            if self.params.LS49.dump_CBF:
+                from dxtbx.format.cbf_writer import FullCBFWriter
+            # assuming one imageset per experiment here : applicable for stills
+                ts = experiments[0].imageset.get_image_identifier(0)
+                xfel_ts = ts[0:4] + ts[5:7] + ts[8:10] + ts[11:13] + ts[14:16] + ts[17:19] + ts[20:23]
+                print ('TIMESTAMPS = ',xfel_ts)
+                if xfel_ts in self.timestamps_to_dump:
+                    cbf_path = os.path.join(self.params.output.logging_dir, 'jungfrauhit_%s.cbf'%xfel_ts)
+                    cbf_writer = FullCBFWriter(imageset=experiments[0].imageset)
+                    cbf_writer.write_cbf(cbf_path)
+                return None
+        except Exception as e:
+            print ('Error dumping CBFs', tag, str(e))
     # Do spotfinding
         try:
             self.debug_write("spotfind_start")
             observed = self.find_spots(experiments)
-            return observed
+            if not self.params.LS49.predict_spots:
+                return observed
         except Exception as e:
             print("Error spotfinding", tag, str(e))
             return None
+
+
+        try:
+            self.debug_write('spot_prediction_start')
+            observed = self.predict_spots_from_rayonix_crystal_model(experiments, observed)
+            return observed
+        except Exception as e:
+            print("Error spotfinding - in spot_prediction", tag, str(e))
+            return None
+
+    def predict_spots_from_rayonix_crystal_model(self, experiments, observed):
+        """ Reads in the indexed rayonix model, predict spots using the crystal model on the jungfrau detector"""
+        pass
+        # Make sure experimental model for rayonix is supplied. Also the experimental geometry of the jungfrau is supplied
+        assert self.params.LS49.path_to_rayonix_crystal_models is not None, 'Rayonix crystal model path is empty. Needs to be specified'
+        assert self.params.LS49.path_to_jungfrau_detector_model is not None, 'Jungfrau_detector model path is empty. Needs to be specified'
+        ts = self.tag.split('_')[-1] # Assuming jungfrau cbfs are names as 'jungfrauhit_20180501133315870' 
+        # Load rayonix experimental model
+        rayonix_fname=os.path.join(self.params.LS49.path_to_rayonix_crystal_models, 'idx-%s_integrated_experiments.json'%ts)
+        rayonix_expt=ExperimentListFactory.from_json_file(rayonix_fname, check_format=False)
+        jungfrau_det=ExperimentListFactory.from_json_file(self.params.LS49.path_to_jungfrau_detector_model, check_format=False)
+        # Reset stuff here
+        # Should have 
+        # a. Jungfrau detector geometry
+        # b. Rayonix indexed crystal model
+        from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
+        from dials.algorithms.indexing import index_reflections
+        experiments[0].detector=jungfrau_det[0].detector
+        experiments[0].crystal=rayonix_expt[0].crystal
+        if False:
+            observed['id']=flex.int(len(observed), -1)
+            observed['imageset_id']=flex.int(len(observed), 0)
+            observed.centroid_px_to_mm(experiments[0].detector, experiments[0].scan)
+            observed.map_centroids_to_reciprocal_space(experiments[0].detector, experiments[0].beam, experiments[0].goniometer)
+            index_reflections(observed, experiments)
+            ref_predictor=ExperimentsPredictorFactory.from_experiments(experiments)
+            ref_predictor(observed)
+            observed['id']=flex.int(len(observed), 0)
+            from libtbx.easy_pickle import dump
+            dump('my_observed_prediction_%s.pickle'%self.tag, observed)
+            dumper=ExperimentListDumper(experiments)
+            dumper.as_json('my_observed_prediction_%s.json'%self.tag)
+        
+        predictor=StillsReflectionPredictor(experiments[0])
+        ubx=predictor.for_ub(experiments[0].crystal.get_A())
+        ubx['id']=flex.int(len(ubx),0)
+        n_predictions = len(ubx)
+        n_observed = len(observed)
+        if len(observed) > 3 and len(ubx) >= len(observed):
+            from libtbx.easy_pickle import dump
+            dump('my_prediction_%s.pickle'%self.tag, ubx)
+            dumper=ExperimentListDumper(experiments)
+            dumper.as_json('my_prediction_%s.json'%self.tag)
+            #from IPython import embed; embed(); exit()
+            exit()
+        
+        
 
     def find_spots(self, experiments):
         from time import time
