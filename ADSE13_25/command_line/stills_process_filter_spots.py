@@ -473,12 +473,12 @@ class Processor_iota(Processor):
                         except Exception as e:
                             print('Indexing failed for some reason', str(e))
                     from libtbx.easy_pickle import dump,load
-                    if True:
+                    if not load_pickle_flag and self.tag is not None:
                         import copy
                         copy_of_experiments_list=copy.deepcopy(experiments_list)
                         copy_of_observed_samples_list=copy.deepcopy(observed_samples_list)
-                        #dump('experiments_list.pickle', experiments_list)
-                        #dump('observed_samples_list.pickle', observed_samples_list)
+                        dump('experiments_list.pickle', experiments_list)
+                        dump('observed_samples_list.pickle', observed_samples_list)
                     if debug_mode:
                         dump('experiments_list.pickle', experiments_list)
                         dump('observed_samples_list.pickle', observed_samples_list)
@@ -784,14 +784,14 @@ class Processor_iota(Processor):
                         self.params.indexing.stills.refine_all_candidates=True #refine_all_candidates_flag
                         # Perform refinement and outlier rejection depending on what flags are turned on
                         from exafel_project.ADSE13_25.refinement.iota_refiner import iota_refiner
-                        refine_in_iterations=False
+                        refine_in_iterations=True
                         if refine_in_iterations:
                             while True:
                                 print ('Refining in iterations rejecting one highest RMS spot at a time')
                                 refiner=iota_refiner(indexed, unrefined_experiments, self.params)
                                 unrefined_experiments, indexed=refiner.run_refinement_and_outlier_rejection()
                                 diff_px=indexed['xyzobs.px.value']-indexed['xyzcal.px']
-                                if diff_px.norm()/math.sqrt(len(diff_px)) < 2.0:
+                                if diff_px.norm()/math.sqrt(len(diff_px)) < 1.0:
                                     experiments=unrefined_experiments
                                     break
                                 if len(indexed) <= self.params.iota.random_sub_sampling.min_indexed_spots:
