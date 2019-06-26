@@ -160,58 +160,70 @@ class iota_indexer(stills_indexer):
 
     # Find lattices i.e the basis vectors & unit cell params
     # Possible to index multiple lattices  ??
-    if provided_experiments is None:
-      experiments.extend(self.find_lattices()) # defined in fft1d
-    else:
-      experiments.extend(provided_experiments)
+    while True:
+      max_lattices = self.params.multiple_lattice_search.max_lattices
+      if max_lattices is not None and len(experiments) >= max_lattices:
+        break 
+      n_lattices_previous_cycle = len(experiments)
+      if len(experiments) == 0:
+        experiments.extend(self.find_lattices())
+      else:
+        try:
+          new = self.find_lattices()
+          experiments.extend(new)
+        except Sorry:
+          print ('Indexing remaining reflections failed')
+          break
 
-    if len(experiments) == 0:
-      raise Sorry("No suitable lattice could be found.")
 
-    # Initialize id values as -1 since no indexing has been done yet
-    self.reflections['id'] = flex.int(len(self.reflections), -1)
+      if len(experiments) == 0:
+        raise Sorry("No suitable lattice could be found.")
 
-    # Now index reflections
-    self.index_reflections(experiments, self.reflections, debug=debug)
+      # Initialize id values as -1 since no indexing has been done yet
+      self.reflections['id'] = flex.int(len(self.reflections), -1)
 
-    # Housekeeping. Apply symmetry
-    target_space_group = self.target_symmetry_primitive.space_group()
-    for i_cryst, cryst in enumerate(experiments.crystals()):
-      new_cryst, cb_op_to_primitive = self.apply_symmetry(
-                                      cryst, target_space_group)
-      if provided_experiments is None:
-        if self.cb_op_primitive_inp is not None:
-          new_cryst = new_cryst.change_basis(self.cb_op_primitive_inp)
-          logger.info(new_cryst.get_space_group().info())
-        cryst.update(new_cryst)
-        cryst.set_space_group(
-            self.params.known_symmetry.space_group.group())
-      for i_expt, expt in enumerate(experiments):
-        if expt.crystal is not cryst:
-          continue
-        if not cb_op_to_primitive.is_identity_op():
-          miller_indices = self.reflections['miller_index'].select(
-              self.reflections['id'] == i_expt)
+      # Now index reflections
+      self.index_reflections(experiments, self.reflections, debug=debug)
 
+      # Housekeeping. Apply symmetry
+      target_space_group = self.target_symmetry_primitive.space_group()
+      for i_cryst, cryst in enumerate(experiments.crystals()):
+        if i_cryst >= n_lattices_previous_cycle:
+          new_cryst, cb_op_to_primitive = self.apply_symmetry(
+                                        cryst, target_space_group)
           if provided_experiments is None:
-            miller_indices = cb_op_to_primitive.apply(miller_indices)
-          self.reflections['miller_index'].set_selected(
-              self.reflections['id'] == i_expt, miller_indices)
+            if self.cb_op_primitive_inp is not None:
+              new_cryst = new_cryst.change_basis(self.cb_op_primitive_inp)
+              logger.info(new_cryst.get_space_group().info())
+            cryst.update(new_cryst)
+            cryst.set_space_group(
+                self.params.known_symmetry.space_group.group())
+          for i_expt, expt in enumerate(experiments):
+            if expt.crystal is not cryst:
+              continue
+            if not cb_op_to_primitive.is_identity_op():
+              miller_indices = self.reflections['miller_index'].select(
+                  self.reflections['id'] == i_expt)
 
-        if self.cb_op_primitive_inp is not None:
-          miller_indices = self.reflections['miller_index'].select(
-              self.reflections['id'] == i_expt)
+              if provided_experiments is None:
+                miller_indices = cb_op_to_primitive.apply(miller_indices)
+              self.reflections['miller_index'].set_selected(
+                  self.reflections['id'] == i_expt, miller_indices)
 
-          if provided_experiments is None:
-            miller_indices = self.cb_op_primitive_inp.apply(miller_indices)
-          self.reflections['miller_index'].set_selected(
-              self.reflections['id'] == i_expt, miller_indices)
-          # IOTA
-          from scitbx.matrix import sqr
-          hklfrac=flex.mat3_double(len(miller_indices), sqr(cryst.get_A()).inverse())*self.reflections['rlp'].select(self.reflections['id']==i_expt)
-          self.reflections['fractional_miller_index'].set_selected(self.reflections['id']==i_expt, hklfrac)
+            if self.cb_op_primitive_inp is not None:
+              miller_indices = self.reflections['miller_index'].select(
+                  self.reflections['id'] == i_expt)
 
-    # Discard nearly overlapping lattices
+              if provided_experiments is None:
+                miller_indices = self.cb_op_primitive_inp.apply(miller_indices)
+              self.reflections['miller_index'].set_selected(
+                  self.reflections['id'] == i_expt, miller_indices)
+              # IOTA
+              from scitbx.matrix import sqr
+              hklfrac=flex.mat3_double(len(miller_indices), sqr(cryst.get_A()).inverse())*self.reflections['rlp'].select(self.reflections['id']==i_expt)
+              self.reflections['fractional_miller_index'].set_selected(self.reflections['id']==i_expt, hklfrac)
+
+      # Discard nearly overlapping lattices
 
     if len(experiments) > 1:
       from dials.algorithms.indexing.compare_orientation_matrices \

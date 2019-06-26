@@ -460,7 +460,6 @@ class Processor_iota(Processor):
                                 experiments_tmp, indexed_tmp = self.index_with_iota(experiments, observed_sample)
                                 for ii,expt_tmp in enumerate(experiments_tmp):
                                     expt_id +=1
-                                    #indexed_tmp['id'].set_selected(indexed_tmp['id']==ii,expt_id)
                                     refl=indexed_tmp.select(indexed_tmp['id']==ii)
                                     refl['id'].set_selected(flex.bool([True]*len(refl['id'])), expt_id)
                                     dump_refls.extend(refl)
@@ -468,8 +467,11 @@ class Processor_iota(Processor):
                             elif self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
                                 experiments_tmp, indexed_tmp = self.index(experiments, observed_sample)
 
-                            experiments_list.append(experiments_tmp)
-                            observed_samples_list.append(observed_sample)
+                            for ii,expt_tmp in enumerate(experiments_tmp):
+                                # Appending each experiment separately to experiments_list 
+                                # and corresponding observation separately to observerd_samples_list
+                                experiments_list.append(ExperimentList([expt_tmp]))
+                                observed_samples_list.append(observed_sample)
                         except Exception as e:
                             print('Indexing failed for some reason', str(e))
                     from libtbx.easy_pickle import dump,load
@@ -507,7 +509,7 @@ class Processor_iota(Processor):
                         else:
                             from exafel_project.ADSE13_25.clustering.consensus_functions import get_uc_consensus as get_consensus
                             known_crystal_models, clustered_experiments_list = get_consensus(experiments_list, show_plot=self.params.iota.random_sub_sampling.show_plot, return_only_first_indexed_model=False, finalize_method=self.params.iota.random_sub_sampling.finalize_method, clustering_params=self.params.iota.clustering)
-                       # from IPython import embed; embed(); exit()
+                    #from IPython import embed; embed(); exit()
                     print ('IOTA: Finalizing consensus')
                     #import pdb; pdb.set_trace() 
                     if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
@@ -538,15 +540,13 @@ class Processor_iota(Processor):
                                 sample[crystal_model].append(observed_samples_list[idx]['spot_id'])
                                 all_experimental_models[crystal_model].append(experiments_list[idx])
                         # FIXME take out
-                        all_indexed_tmp = flex.reflection_table()
                         all_experiments_tmp = ExperimentList()
                         tmp_counter = 0
                         unrefined_experiments=ExperimentList()
-                        all_dh_cutoffs=[]
-                        all_dh=[]
                         for crystal_model in sample:
                             # Need to have a minimum number of experiments for correct stats
                             # FIXME number should not be hardcoded. ideally a phil param
+                            all_indexed_tmp = flex.reflection_table()
                             if len(all_experimental_models[crystal_model]) < 3:
                                 continue
                             self.known_crystal_models = None
@@ -649,7 +649,7 @@ class Processor_iota(Processor):
                                     # find dh = |h_frac - h_centroid|
                                     # indexed_idxlist is list of indices in indexed_tmp if xyzobs.mm.value is in indexed_centroid
                                     indexed_idxlist = [idx for idx,elem in enumerate(indexed_tmp['xyzobs.mm.value'])
-                                                       if elem in indexed_centroid['xyzobs.mm.value']]
+                                                      if elem in indexed_centroid['xyzobs.mm.value']]
                                     dh_list_tmp = flex.double()
                                     for idx in indexed_idxlist:
                                         centroid_list_idx = list(indexed_centroid['xyzobs.mm.value']).index(indexed_tmp['xyzobs.mm.value'][idx])
@@ -713,8 +713,6 @@ class Processor_iota(Processor):
                                                 lfrac.sample_standard_deviation()*lfrac.sample_standard_deviation()
                                     dh_cutoff_noZ = math.sqrt(dh_cutoff)
                                     dh_cutoff = math.sqrt(dh_cutoff)*Z_cutoff
-                                    #all_dh_cutoffs.append(dh_cutoff)
-                                    #all_dh.append(dh)
                                     panel = experiments_centroid.detectors()[0][0]
                                     beam = experiments_centroid.beams()[0]
                                     resolution = panel.get_resolution_at_pixel(beam.get_s0(),refl['xyzobs.px.value'][0:2])

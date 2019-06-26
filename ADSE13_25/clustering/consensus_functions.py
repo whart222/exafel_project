@@ -136,6 +136,11 @@ class clustering_manager(group_args):
     if self.strategy=='one_cluster':
         debug_fix_clustering=False
         strategy2=True
+    if self.strategy=='strategy_3':
+        debug_fix_clustering=False
+        strategy3=True
+        strategy2=False
+
     if debug_fix_clustering:
       if not pick_top_solution:
         delta_z_cutoff = min(1.0, max(delta_z))
@@ -168,7 +173,7 @@ class clustering_manager(group_args):
               continue
             if delta_z_of_rho_order_0-candidate_delta_z[i_sorted[i]] > 1.0:
               if i>1:
-                if candidate_delta_z[i_sorted[i-1]]-candidate_delta_z[i_sorted[0]] > 1.0:
+                if -candidate_delta_z[i_sorted[i-1]]+candidate_delta_z[i_sorted[0]] > 1.0:
                   centroids.append(centroid_candidates[i_sorted[i]])
               else:
                 centroids.append(centroid_candidates[i_sorted[i]])
@@ -209,7 +214,33 @@ class clustering_manager(group_args):
       cluster_id[item_idx]=n_cluster # Only cluster assigned
       print ('CLUSTERING_STATS',item_idx,cluster_id[item_idx])
       n_cluster +=1
-    
+    elif strategy3:
+      # use product of delta and rho and pick out top candidates
+      # have to use a significance z_score to filter out the very best
+      product_list_of_ranks=flex.double()
+      for ic in range(NN):
+        rho_tmp=self.rho[ic]
+        delta_tmp=self.delta[ic]
+        product_list_of_ranks.append(rho_tmp*delta_tmp)
+      from IPython import embed; embed(); exit()
+      import numpy as np
+      stdev=np.std(product_list_of_ranks)
+      mean=np.mean(product_list_of_ranks)
+      iid_sorted=flex.sort_permutation(product_list_of_ranks, reverse=True)
+      cluster_id[iid_sorted[0]]=n_cluster # first point always a cluster
+      print ('CLUSTERING_STATS S3',iid_sorted[0],cluster_id[iid_sorted[0]])
+      z_critical = 5.0 # 5 sigma significance ?
+      # Only go through say 3-4 datapoints 
+      # basically there won't be more than 2-3 lattices on an image realistically
+      for iid in iid_sorted[1:4]:
+        z_score=(product_list_of_ranks[iid]-mean)/stdev
+        if z_score > z_critical:
+          n_cluster +=1
+          cluster_id[iid]=n_cluster
+          print ('CLUSTERING_STATS S3',iid,cluster_id[iid])
+        else:
+          break # No point going over all points once below threshold z_score
+
     else:
       for ic in range(NN):
         item_idx = delta_order[ic]
@@ -228,7 +259,6 @@ class clustering_manager(group_args):
       if cluster_id[x] >= 0:
         print ("XC", x,cluster_id[x], rho[x], delta[x])
     self.cluster_id_maxima = cluster_id.deep_copy()
-    #from IPython import embed; embed(); exit()
     R.cluster_assignment(rho_order, cluster_id, rho)
     self.cluster_id_full = cluster_id.deep_copy()
 
@@ -261,7 +291,6 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
     return [experiments_list[0].crystals()[0]], None
   cells = []
 
-  #from IPython import embed; embed(); exit()
   from xfel.clustering.singleframe import CellOnlyFrame
   # Flag for testing Lysozyme data from NKS.Make sure cluster_regression repository is present and configured
   # Program will exit after plots are displayed if this flag is true
@@ -326,7 +355,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   print ('d_c = ',d_c)
   if len(cells) < 5:
     return [experiments_list[0].crystals()[0]], None
-  CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=clustering_params.max_percentile_rho_uc,Z_delta=clustering_params.Z_delta)
+  CM = clustering_manager(Dij=Dij, d_c=d_c, max_percentile_rho=clustering_params.max_percentile_rho_uc,Z_delta=clustering_params.Z_delta, strategy='strategy_3')
   n_cluster = 1+flex.max(CM.cluster_id_final)
   print (len(cells), ' datapoints have been analyzed')
   print ('%d CLUSTERS'%n_cluster)
@@ -342,7 +371,6 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   if show_plot:
     # Decision graph
     import matplotlib.pyplot as plt
-    #from IPython import embed; embed()
     plt.plot(CM.rho, CM.delta, "r.", markersize=3.)
     for x in range(NN):
       if CM.cluster_id_maxima[x] >=0:
@@ -366,7 +394,6 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   #
   do_orientational_clustering = not return_only_first_indexed_model # temporary.
   dxtbx_crystal_models = []
-  #from IPython import embed; embed()
   if do_orientational_clustering:
     print ('IOTA: Starting orientational clustering')
     Dij_ori = {} # dictionary to store Dij for each cluster
@@ -374,18 +401,19 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
     from collections import Counter
     uc_cluster_count = Counter(list(CM.cluster_id_final))
     # instantiate the Dij_ori flat 1-d array
-    #from IPython import embed; embed();
     # Put all experiments list from same uc cluster together
     if True:
       from scitbx.matrix import sqr
       from cctbx_orientation_ext import crystal_orientation
-      #crystal_orientation_list = []
-      #for i in range(len(experiments_list)):
-      #  crystal_orientation_list.append(crystal_orientation(experiments_list[i].crystals()[0].get_A(), True))
-        #from IPython import embed; embed();
+      crystal_orientation_list = []
+      all_A= []
+      for i in range(len(experiments_list)):
+        crystal_orientation_list.append(crystal_orientation(experiments_list[i].crystals()[0].get_A(), True))
         #exit()
-        #A_direct = sqr(crystal_orientation_list[i].reciprocal_matrix()).transpose().inverse()
-        #print ("Direct A matrix 1st element = %12.6f"%A_direct[0])
+        A_direct = sqr(crystal_orientation_list[i].reciprocal_matrix()).transpose().inverse()
+        all_A.append(A_direct[0])
+        print ("Direct A matrix 1st element = %12.6f"%A_direct[0])
+    #  exit()
     CM_mapping = {}
     for i in range(len(experiments_list)):
       if CM.cluster_id_full[i] not in uc_experiments_list:
@@ -420,7 +448,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       #else:
       #d_c_ori=flex.mean_and_variance(Dij_ori[cluster].as_1d()).unweighted_sample_standard_deviation()
       print ('d_c_ori=',d_c_ori)
-      CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=clustering_params.max_percentile_rho_ori, Z_delta=clustering_params.Z_delta)
+      CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=clustering_params.max_percentile_rho_ori, Z_delta=clustering_params.Z_delta, strategy='strategy_3')
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       for i in range(n_cluster_ori):
         if len([zz for zz in CM_ori.cluster_id_final if zz == i]) < clustering_params.min_datapts:
@@ -441,9 +469,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         A_matrices.append(A_direct)
         print ("IOTA: Direct A matrix 1st element of orientational cluster %d  = %12.6f"%(i,A_direct[0]))
         print (A_direct)
-      #from IPython import embed; embed(); exit()
       if show_plot:
-        #from IPython import embed; embed(); exit()
         # Decision graph
         stretch_plot_factor = 1.05 # (1+fraction of limits by which xlim,ylim should be set)
         import matplotlib.pyplot as plt
@@ -451,12 +477,10 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         for x in range(len(list(CM_ori.cluster_id_final))):
           if CM_ori.cluster_id_maxima[x] >=0:
             plt.plot([CM_ori.rho[x]], [CM_ori.delta[x]], "ro")
-        #from IPython import embed; embed();
         #exit()
         plt.xlim([-10,stretch_plot_factor*flex.max(CM_ori.rho)])
         plt.ylim([-10,stretch_plot_factor*flex.max(CM_ori.delta)])
         plt.show()
-  #from IPython import embed; embed()
   # FIXME Still to be worked out what exactly should be returned
   #if return_only_first_indexed_model:
   #  return [experiments_list[0].crystals()[0]], clustered_experiments_list
@@ -488,7 +512,6 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         cryst_b_best=Crystal(cryst_b_ori_best.direct_matrix()[0:3], cryst_b_ori_best.direct_matrix()[3:6], cryst_b_ori_best.direct_matrix()[6:9], 'P 1 21 1')
         R_ab, axis, angle, cb_op_ab = difference_rotation_matrix_axis_angle(cryst_a, cryst_b_best)
         # FIXME
-        #from IPython import embed; embed(); exit()
         if abs(angle) < min_angle: # degrees
           close_models_list.append((i_a, i_b))
 
@@ -509,7 +532,6 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
     dxtbx_crystal_models=[x for x in dxtbx_crystal_models if x is not None]
 
   if len(dxtbx_crystal_models) > 0:
-    #from IPython import embed; embed(); exit()
     return dxtbx_crystal_models, list(clustered_experiments_list)
   else:
     # If nothing works, atleast return the 1st crystal model that was found
