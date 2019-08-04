@@ -10,6 +10,7 @@ debug_handle = log.debug_handle(logger)
 info_handle = log.info_handle(logger)
 
 from libtbx.utils import Sorry
+from libtbx.phil import parse
 
 from dials_algorithms_indexing_ext import *
 
@@ -18,6 +19,19 @@ import iotbx.phil # implicit import
 from dials.array_family import flex
 from cctbx import crystal
 from dials.algorithms.indexing.stills_indexer import stills_indexer
+
+
+iota_refiner_phil_str = '''
+iota_mosaicity {
+  domain_size_ang = None
+    .type = float
+    .help = If set to a value, forces the domain size of all crystals to this value, So doesnt matter what Nave refinement did 
+  half_deg = None
+    .type = float
+    .help = If set to a value, forces the mosaic half degree angle of all crystals to this values, so doesnt matter what Nave refinement did 
+}
+'''
+iota_refiner_scope = parse(iota_refiner_phil_str)
 
 
 
@@ -56,6 +70,13 @@ class iota_refiner(stills_indexer):
     except Exception as e:
       s = str(e)
       raise Sorry(e)
+    # Force mosaicity values to certain values depending on phil params
+    if self.all_params.iota.iota_mosaicity.domain_size_ang is not None:
+      for exp in refined_experiments:
+        exp.crystal.set_domain_size_ang(self.all_params.iota.iota_mosaicity.domain_size_ang)
+    if self.all_params.iota.iota_mosaicity.half_deg is not None:
+      for exp in refined_experiments:
+        exp.crystal.set_half_mosaicity_deg(self.all_params.iota.iota_mosaicity.half_deg)
 
     # sanity check for unrealistic unit cell volume increase during refinement
     # usually this indicates too many parameters are being refined given the

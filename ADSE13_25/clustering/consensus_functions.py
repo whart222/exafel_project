@@ -222,7 +222,6 @@ class clustering_manager(group_args):
         rho_tmp=self.rho[ic]
         delta_tmp=self.delta[ic]
         product_list_of_ranks.append(rho_tmp*delta_tmp)
-      from IPython import embed; embed(); exit()
       import numpy as np
       stdev=np.std(product_list_of_ranks)
       mean=np.mean(product_list_of_ranks)
