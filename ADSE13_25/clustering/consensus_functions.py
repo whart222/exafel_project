@@ -52,11 +52,11 @@ def get_dij_ori(cryst1, cryst2, is_reciprocal=True):
   cryst2_ori = crystal_orientation(cryst2.get_A(), is_reciprocal)
   try:
     best_similarity_transform = cryst2_ori.best_similarity_transformation(
-        other = cryst1_ori, fractional_length_tolerance = 20.00,
+        other = cryst1_ori, fractional_length_tolerance = 50.00,
         unimodular_generator_range=1)
     cryst2_ori_best=cryst2_ori.change_basis(best_similarity_transform)
   except Exception as e:
-    print (str(e))
+    #print (str(e))
     cryst2_ori_best = cryst2_ori
   #print 'difference z-score = ', cryst1_ori.difference_Z_score(cryst2_ori_best)
   return cryst1_ori.difference_Z_score(cryst2_ori_best)
@@ -82,10 +82,10 @@ def estimate_d_c(Dij):
     moving_avg_bin.append(flex.mean(flex.double(list(y[i:i+10]))))
   # There has to be one cluster close to 0.0, take that as reference point and find out where the next cluster is
   min_avg = min(moving_avg_bin)*2.0
-  d_c=10.0
+  d_c=1.0
   for i, avg in enumerate(moving_avg_bin):
     if avg<=min_avg:
-      d_c= float(i*10.0)+1.0
+      d_c= float(i*10.0)
       break
   return d_c
 
@@ -223,19 +223,21 @@ class clustering_manager(group_args):
         delta_tmp=self.delta[ic]
         product_list_of_ranks.append(rho_tmp*delta_tmp)
       import numpy as np
-      stdev=np.std(product_list_of_ranks)
-      mean=np.mean(product_list_of_ranks)
       iid_sorted=flex.sort_permutation(product_list_of_ranks, reverse=True)
       cluster_id[iid_sorted[0]]=n_cluster # first point always a cluster
+      n_cluster +=1
       print ('CLUSTERING_STATS S3',iid_sorted[0],cluster_id[iid_sorted[0]])
-      z_critical = 5.0 # 5 sigma significance ?
+      product_list_of_ranks[iid_sorted[0]]=0.0 # set this to 0.0 so that the mean/stdev does not get biased by one point
+      stdev=np.std(product_list_of_ranks)
+      mean=np.mean(product_list_of_ranks)
+      z_critical = 3.0 # 2 sigma significance ?
       # Only go through say 3-4 datapoints 
       # basically there won't be more than 2-3 lattices on an image realistically
-      for iid in iid_sorted[1:4]:
+      for iid in iid_sorted[1:3]:
         z_score=(product_list_of_ranks[iid]-mean)/stdev
         if z_score > z_critical:
-          n_cluster +=1
           cluster_id[iid]=n_cluster
+          n_cluster +=1
           print ('CLUSTERING_STATS S3',iid,cluster_id[iid])
         else:
           break # No point going over all points once below threshold z_score
@@ -411,7 +413,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         #exit()
         A_direct = sqr(crystal_orientation_list[i].reciprocal_matrix()).transpose().inverse()
         all_A.append(A_direct[0])
-        print ("Direct A matrix 1st element = %12.6f"%A_direct[0])
+        #print ("Direct A matrix 1st element = %12.6f %12.6f %12.6f"%(A_direct[0], A_direct[1], A_direct[2]))
     #  exit()
     CM_mapping = {}
     for i in range(len(experiments_list)):
@@ -432,6 +434,9 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       for i in range(N_samples_in_cluster-1):
         for j in range(i+1, N_samples_in_cluster):
           dij_ori = get_dij_ori(uc_experiments_list[cluster][i].crystals()[0],uc_experiments_list[cluster][j].crystals()[0])
+          A_direct_i = sqr(uc_experiments_list[cluster][i].crystals()[0].get_A()).transpose().inverse()
+          A_direct_j = sqr(uc_experiments_list[cluster][j].crystals()[0].get_A()).transpose().inverse()
+          #print ("Direct A matrix 1st element = %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f"%(dij_ori, A_direct_i[0], A_direct_j[0], A_direct_i[1],A_direct_j[1], A_direct_i[2], A_direct_j[2] ))
           Dij_ori[cluster][N_samples_in_cluster*i+j] = dij_ori
           Dij_ori[cluster][N_samples_in_cluster*j+i] = dij_ori
 
@@ -447,8 +452,10 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       #else:
       #d_c_ori=flex.mean_and_variance(Dij_ori[cluster].as_1d()).unweighted_sample_standard_deviation()
       print ('d_c_ori=',d_c_ori)
+      #import pdb; pdb.set_trace()
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=clustering_params.max_percentile_rho_ori, Z_delta=clustering_params.Z_delta, strategy='strategy_3')
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
+      #from IPython import embed; embed(); exit()
       for i in range(n_cluster_ori):
         if len([zz for zz in CM_ori.cluster_id_final if zz == i]) < clustering_params.min_datapts:
           continue
@@ -485,6 +492,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
   #  return [experiments_list[0].crystals()[0]], clustered_experiments_list
   # Make sure the crystal models are not too close to each other
   # FIXME should be a PHIL
+  #from IPython import embed; embed(); exit()
   min_angle = 5.0 # taken from indexer.py
   close_models_list = []
   # Not used really; other fixes have been made to code to figure out outliers
@@ -530,6 +538,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         clustered_experiments_list.set_selected(clustered_experiments_list==unique_experiments_list[ii], counter)
     dxtbx_crystal_models=[x for x in dxtbx_crystal_models if x is not None]
 
+  #from IPython import embed; embed(); exit()
   if len(dxtbx_crystal_models) > 0:
     return dxtbx_crystal_models, list(clustered_experiments_list)
   else:
