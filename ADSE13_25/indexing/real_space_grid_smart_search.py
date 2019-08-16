@@ -15,6 +15,12 @@ from dials.algorithms.indexing.indexer import is_approximate_integer_multiple
 from dxtbx.model.experiment_list import Experiment, ExperimentList
 from dials.algorithms.indexing.real_space_grid_search import indexer_real_space_grid_search
 
+
+def compute_functional(vector, reciprocal_lattice_points):
+  two_pi_S_dot_v = 2 * math.pi * reciprocal_lattice_points.dot(vector)
+  cosines = flex.cos(two_pi_S_dot_v)
+  return flex.sum(flex.cos(two_pi_S_dot_v))
+
 class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
   def __init__ (self, reflections, experiments, params):
     super(indexer_real_space_grid_smart_search, self).__init__(reflections, experiments, params)
@@ -34,16 +40,13 @@ class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
                         crystal=cm))
     return experiments
 
-  def get_finegrained_SST(self, coarse_sampling_grid=0.02):
+  def get_finegrained_SST(self, coarse_sampling_grid=0.005):
     d_min = self.params.refinement_protocol.d_min_start
     sel = self.reflections["id"] == -1
     if d_min is not None:
       sel &= 1 / self.reflections["rlp"].norms() > d_min
     reciprocal_lattice_points = self.reflections["rlp"].select(sel)
     print("Indexing from %i reflections COARSE" % len(reciprocal_lattice_points))
-    def compute_functional(vector):
-      two_pi_S_dot_v = 2 * math.pi * reciprocal_lattice_points.dot(vector)
-      return flex.sum(flex.cos(two_pi_S_dot_v))
 
     from rstbx.array_family import flex
     from rstbx.dps_core import SimpleSamplerTool
@@ -64,7 +67,7 @@ class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
     for i, direction in enumerate(SST.angles):
       for l in unique_cell_dimensions:
         v = matrix.col(direction.dvec) * l
-        f = compute_functional(v.elems)
+        f = compute_functional(v.elems, reciprocal_lattice_points)
         vectors.append(v.elems)
         function_values.append(f)
         SST_all_angles.append(direction)
@@ -84,10 +87,10 @@ class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
       if i > 0:
         for v_u in unique_vectors:
           if v.length() < v_u.length():
-            if is_approximate_integer_multiple(v, v_u):
+            if is_approximate_integer_multiple(v, v_u, relative_tolerance=0.2, angular_tolerance=5.0):
               is_unique = False
               break
-          elif is_approximate_integer_multiple(v_u, v):
+          elif is_approximate_integer_multiple(v_u, v, relative_tolerance=0.2, angular_tolerance=5.0):
             is_unique = False
             break
       if is_unique:
@@ -100,8 +103,7 @@ class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
     for v in unique_indices:
       direction=SST.angles[v//len(unique_cell_dimensions)]
       SST_filter.append(direction)
-    SST.construct_hemisphere_grid_finegrained(0.0005, coarse_sampling_grid, SST_filter)
-    #from IPython import embed; embed(); exit()
+    SST.construct_hemisphere_grid_finegrained(0.0001, coarse_sampling_grid, SST_filter)
     return SST
 
   def real_space_grid_smart_search(self):
@@ -113,9 +115,6 @@ class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
       sel &= 1 / self.reflections["rlp"].norms() > d_min
     reciprocal_lattice_points = self.reflections["rlp"].select(sel)
     print("Indexing from %i reflections FINE " % len(reciprocal_lattice_points))
-    def compute_functional(vector):
-      two_pi_S_dot_v = 2 * math.pi * reciprocal_lattice_points.dot(vector)
-      return flex.sum(flex.cos(two_pi_S_dot_v))
 
     from rstbx.array_family import flex
     from rstbx.dps_core import SimpleSamplerTool
@@ -130,17 +129,39 @@ class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
                  %(len(SST.finegrained_angles) * len(unique_cell_dimensions)))
     vectors = flex.vec3_double()
     function_values = flex.double()
+    # Do a search within the cluster of coarse grids and only return the top few values ?
+    find_max_within_cluster=True
     import time
     time1=time.time()
-    for i, direction in enumerate(SST.finegrained_angles):
-      for l in unique_cell_dimensions:
-        v = matrix.col(direction.dvec) * l
-        f = compute_functional(v.elems)
-        vectors.append(v.elems)
-        function_values.append(f)
+    if find_max_within_cluster:
+      top_n_values=1 # number of top scoring vectors to return in each coarse grid per unique dimension
+      for count in range(len(SST.n_entries_finegrained[:-1])):
+        start=SST.n_entries_finegrained[count]
+        end=SST.n_entries_finegrained[count+1]
+        for l in unique_cell_dimensions:
+          tmp_vectors = flex.vec3_double()
+          tmp_function_values = flex.double()
+          for i, direction in enumerate(SST.finegrained_angles[start:end]):
+            v = matrix.col(direction.dvec) * l
+            f = compute_functional(v.elems, reciprocal_lattice_points)
+            tmp_vectors.append(v.elems)
+            tmp_function_values.append(f)
+          perm=flex.sort_permutation(tmp_function_values, reverse=True)
+          tmp_vectors=tmp_vectors.select(perm)[0:top_n_values]
+          tmp_function_values=tmp_function_values.select(perm)[0:top_n_values]
+          vectors.extend(tmp_vectors)
+          function_values.extend(tmp_function_values)
+
+    else:
+      for i, direction in enumerate(SST.finegrained_angles):
+        for l in unique_cell_dimensions:
+          v = matrix.col(direction.dvec) * l
+          f = compute_functional(v.elems, reciprocal_lattice_points)
+          vectors.append(v.elems)
+          function_values.append(f)
+     
     time2=time.time()
     print ('FINE GRID SEARCH TIME=',time2-time1)
-    #import pdb; pdb.set_trace()
 
     perm = flex.sort_permutation(function_values, reverse=True)
     vectors = vectors.select(perm)
@@ -149,22 +170,26 @@ class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
     unique_vectors = []
     unique_indices = []
     i = 0
+    time1 = time.time()
     while len(unique_vectors) < 30:
       v = matrix.col(vectors[i])
       is_unique = True
       if i > 0:
         for v_u in unique_vectors:
           if v.length() < v_u.length():
-            if is_approximate_integer_multiple(v, v_u):
+            if is_approximate_integer_multiple(v, v_u, relative_tolerance=0.2, angular_tolerance=2.0):
               is_unique = False
               break
-          elif is_approximate_integer_multiple(v_u, v):
+          elif is_approximate_integer_multiple(v_u, v, relative_tolerance=0.2, angular_tolerance=2.0):
             is_unique = False
             break
       if is_unique:
         unique_vectors.append(v)
         unique_indices.append(perm[i])
       i += 1
+    time2 = time.time()
+    print ('FINE GRID UNIQUE VECTOR SEARCH TIME = ', time2-time1)
+    #from IPython import embed; embed(); exit()
     # FIXME debugging here 
     #for direction in SST.finegrained_angles:
     #  print ('DEBUGGGG = ', direction.phi, direction.psi)
@@ -176,7 +201,7 @@ class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
 
     for i in range(len(unique_vectors)):
       logger.debug("%s %s %s"% (
-                    str(compute_functional(unique_vectors[i].elems)),
+                    str(compute_functional(unique_vectors[i].elems, reciprocal_lattice_points)),
                     str(unique_vectors[i].length()),
                     str(unique_vectors[i].elems)))
 
