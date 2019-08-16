@@ -37,9 +37,18 @@ iota {
     ntrials = 50
       .type = int
       .help = Number of random sub-samples to be selected
+    auto_select_Nspots = False
+      .type = bool
+      .help = auto select the number of spots to be sub sampled. This can be customized based on the experiment\
+              In LS49, the five_number_summary of strong spots was 16,21,30,39,157. Useful to adjust the number\
+              of chosen spots for indexing based on total strong spots in the image\
+              This option will override fraction_sub_sample and Nspots_sub_sample
     fraction_sub_sample = 0.8
       .type = float
       .help = fraction of sample to be sub-sampled. Should be between 0 and 1
+    Nspots_sub_sample = None
+      .type = int
+      .help = Number of spots to sub-sample. Will over-ride fraction_sub_sample 
     consensus_function = *unit_cell
       .type = choice
       .help = choose the type of consensus function to be employed for random_sub_sampling. More details \
@@ -59,7 +68,7 @@ iota {
               reindex_with_known_crystal_models will just index the spots with \
               known_orientation_indexer. Useful if clustering fails but indexing \
               succeeds in limited trials
-    Z_cutoff = 1.3
+    Z_cutoff = 2.0
       .type = float
       .help = Z-score cutoff for accepting/rejecting bragg spots based on difference between \
               fractional and integer hkl. This will be used for finalize_method = union_and_reindex
@@ -70,11 +79,11 @@ iota {
       .type = bool
       .help = if True, adjusts detector distance to try minimize rcalc-robs for unrefined indexing \
               results.
-    debug_mode = True
+    debug_mode = False
       .type = bool
       .help = If enabled, it will dump the json/pickles of all the IOTA trials and exit. Useful when debugging\
               remainder of the program
-    load_pickle_flag = True
+    load_pickle_flag = False
       .type = bool
       .help = If enabled, it will load dumped json/pickle of an IOTA trial and proceed with clustering and refinement 
     ts_to_load = None
@@ -82,9 +91,14 @@ iota {
       .help = name of tag to load up for debugging. These will be dumped ensemble experiments/observed lists\
               These will be on disk in the form tag_ensemble_exp_list.pickle and tag_ensemble_obs_list.pickle \
               Will only be used if load_pickle_flag is turned on
+    dump_indexing_trials = False
+      .type = bool
+      .help = flag to indicate whether or not to dump indexing trials (experiments and reflection tables). Useful for\
+              debugging. Note that tag information should also be there otherwise files wont be dumped
 
   }
   include scope exafel_project.ADSE13_25.clustering.consensus_functions.clustering_iota_scope
+  include scope exafel_project.ADSE13_25.refinement.iota_refiner.iota_refiner_scope
 }
 '''
 
@@ -405,7 +419,7 @@ class Processor_iota(Processor):
             # Try finding spots that are too close to each other and kick one of them out
             if self.params.iota.filter_spots:
                 obs = observed['xyzobs.px.value']
-                critical_robs = 7.0
+                critical_robs = 5.0
                 from scitbx.matrix import col
                 from annlib_ext import AnnAdaptor
                 from dials.array_family import flex
@@ -425,6 +439,20 @@ class Processor_iota(Processor):
                     observed = observed.select(flex.bool(pop_table))
                     from libtbx.easy_pickle import dump
                     dump('filtered.pickle', observed)
+            if False:
+                from dials.array_family import flex
+                refl_0=flex.reflection_table.from_file('lattice_0.pickle') 
+                for ii,refl in enumerate(refl_0):
+                    observed.del_selected(observed['xyzobs.px.value'].is_equal_to_vec3_double(refl_0['xyzobs.px.value'][ii]))
+
+            if False:
+                # Try to select the first N bright reflections and see if that helps ?
+                from dials.array_family import flex
+                observed.sort('intensity.sum.value', reverse=True)
+                observed=observed[0:51]
+
+
+            print ('TOTAL SPOTS NOW ',len(observed))
 
             if self.params.dispatch.index:
                 if self.params.iota.method == 'random_sub_sampling':
@@ -452,7 +480,24 @@ class Processor_iota(Processor):
                         if not debug_mode and load_pickle_flag:
                             continue
                         flex.set_random_seed(trial+1001)
-                        observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
+
+                        if self.params.iota.random_sub_sampling.auto_select_Nspots: 
+                            LS49_five_number_summary_strong_spots = (16,21,30,39,157) # from run 222
+                            lucky_number = 100 # number of spots to be left out !!
+                            if len(observed) <= lucky_number:
+                                #
+                                Nspots = int(len(observed)*0.75)
+                            else:
+                                #
+                                #nfrac = 0.7-(len(observed)-30)/(240)
+                                nfrac=0.6
+                                Nspots = int(len(observed)*nfrac)
+                            observed_sample = observed.select(flex.random_selection(len(observed),Nspots))
+                        elif self.params.iota.random_sub_sampling.Nspots_sub_sample is not None:
+                            if len(observed) > self.params.iota.random_sub_sampling.Nspots_sub_sample:
+                                observed_sample =  observed.select(flex.random_selection(len(observed),self.params.iota.random_sub_sampling.Nspots_sub_sample)) 
+                        else:
+                            observed_sample = observed.select(flex.random_selection(len(observed), int(len(observed)*self.params.iota.random_sub_sampling.fraction_sub_sample)))
                         try:
                             print ('IOTA: SUM_INTENSITY_VALUE',sum(observed_sample['intensity.sum.value']), ' ',trial, len(observed_sample))
                             if self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
@@ -474,6 +519,8 @@ class Processor_iota(Processor):
                                 observed_samples_list.append(observed_sample)
                         except Exception as e:
                             print('Indexing failed for some reason', str(e))
+
+
                     from libtbx.easy_pickle import dump,load
                     if not load_pickle_flag and self.tag is not None:
                         import copy
@@ -489,8 +536,8 @@ class Processor_iota(Processor):
                         ref_predictor = ExperimentsPredictorFactory.from_experiments(dump_expts, force_stills=experiments.all_stills())
                         dump_refls=ref_predictor(dump_refls)
                         dump('indexed_list.pickle', dump_refls)
-                        dump = ExperimentListDumper(dump_expts)
-                        dump.as_json('indexed_exp.json')
+                        dumper = ExperimentListDumper(dump_expts)
+                        dumper.as_json('indexed_exp.json')
                         exit()
                     #from libtbx.easy_pickle import load
                     if not debug_mode and load_pickle_flag:
@@ -501,6 +548,11 @@ class Processor_iota(Processor):
                         else:
                             experiments_list = load(tag+'_ensemble_exp_list.pickle')
                             observed_samples_list = load(tag+'_ensemble_obs_list.pickle')
+
+                    # Dump indexing trial files for debugging if necessary
+                    if self.params.iota.random_sub_sampling.dump_indexing_trials and self.tag is not None:
+                        dump(os.path.join(self.params.output.output_dir,self.tag+'_ensemble_exp_list.pickle'), experiments_list)
+                        dump(os.path.join(self.params.output.output_dir,self.tag+'_ensemble_obs_list.pickle'), observed_samples_list)
                     # Dump out json file and pickle file of the indexed reflections as separate ids
                     if self.params.iota.random_sub_sampling.consensus_function == 'unit_cell':
                         if self.params.iota.random_sub_sampling.finalize_method == 'reindex_with_known_crystal_models':
@@ -620,10 +672,14 @@ class Processor_iota(Processor):
                                     #print ('A-matrix reference=', cryst_ref_ori.direct_matrix())
                                     #print ('A-matrix reference=', cryst_tmp_ori.direct_matrix())
                                     #from IPython import embed; embed(); exit()
-                                    best_similarity_transform = cryst_tmp_ori.best_similarity_transformation(
-                                      other = cryst_ref_ori, fractional_length_tolerance = 20.00,
-                                      unimodular_generator_range=1)
-                                    cryst_tmp_ori_best=cryst_tmp_ori.change_basis(best_similarity_transform)
+                                    try:
+                                        best_similarity_transform = cryst_tmp_ori.best_similarity_transformation(
+                                          other = cryst_ref_ori, fractional_length_tolerance = 50.00,
+                                          unimodular_generator_range=1)
+                                        cryst_tmp_ori_best=cryst_tmp_ori.change_basis(best_similarity_transform)
+                                    except Exception as e:
+                                        print ('Transforming failed')
+                                        cryst_tmp_ori_best=cryst_tmp_ori 
                                     obs.crystals()[0].set_A(cryst_tmp_ori_best.reciprocal_matrix())
 
 
@@ -703,7 +759,7 @@ class Processor_iota(Processor):
                                                   refl['miller_index'][2]-refl['fractional_miller_index'][2]]).norm()
                                     hfrac,kfrac,lfrac = refl_sameHKL_ensemble['fractional_miller_index'].parts()
                                     # FIXME arbitrary cutoff: if not enough datapoints, cant do a statistical analysis
-                                    if len(list(hfrac)) < 10:
+                                    if len(list(hfrac)) < 5:
                                         #from IPython import embed; embed(); exit()
                                         print ('NOT_ENOUGH_STATS=',refl['miller_index'],dh)
                                         continue
@@ -728,7 +784,7 @@ class Processor_iota(Processor):
                                     if dh < dh_cutoff and refl['miller_index'] != (0,0,0):
                                         indexed_spots_idx.append(ii)
                                 # Make sure the number of spots indexed by a model is above a threshold
-                                if len(indexed_centroid.select(flex.size_t(indexed_spots_idx))) > self.params.iota.random_sub_sampling.min_indexed_spots:
+                                if len(indexed_centroid.select(flex.size_t(indexed_spots_idx))) >= self.params.iota.random_sub_sampling.min_indexed_spots:
                                     indexed.extend(indexed_centroid.select(flex.size_t(indexed_spots_idx)))
                                     # Need to append properly
                                     for iexpt,expt in enumerate(experiments_centroid):
@@ -760,6 +816,7 @@ class Processor_iota(Processor):
 
                         for ii,iid in enumerate(original_ids):
                             indexed['id'].set_selected(indexed['id'] == iid,ii)
+
                         # FIXME
                         # Attempt to do an outlier rejection based on RMSD values at the end
                         if False:
@@ -776,10 +833,22 @@ class Processor_iota(Processor):
                                         outliers[sorted_iid[jj]]=True
                                     break
                             indexed=indexed.select(outliers) 
+
+                        # Ensure each id in indexed has atleast a minimum number of entries
+                        id_count = collections.Counter(indexed['id'])
+                        for ii, iid in enumerate(id_count):
+                            if id_count[iid] <= self.params.iota.random_sub_sampling.min_indexed_spots: 
+                                print ('Rejecting experiment id %s because of too few spots [%s]'%(iid, id_count[iid]))
+                                indexed.del_selected(indexed['id']==iid)
+                                del unrefined_experiments[ii]
+
                         # Forcing outlier rejection to be False and refine_all_candidates to be True
                         # Logic is IOTA does its own outlier rejection through dh_cutoff but needs a refinement step at the end
                         self.params.indexing.stills.candidate_outlier_rejection=False #outlier_rejection_flag
                         self.params.indexing.stills.refine_all_candidates=True #refine_all_candidates_flag
+                        if False:
+                            self.known_crystal_models = unrefined_experiments.crystals()
+                            unrefined_experiments, indexed = self.index_with_known_orientation(unrefined_experiments, observed)
                         # Perform refinement and outlier rejection depending on what flags are turned on
                         from exafel_project.ADSE13_25.refinement.iota_refiner import iota_refiner
                         refine_in_iterations=True
@@ -792,7 +861,14 @@ class Processor_iota(Processor):
                                 if diff_px.norm()/math.sqrt(len(diff_px)) < 1.0:
                                     experiments=unrefined_experiments
                                     break
-                                if len(indexed) <= self.params.iota.random_sub_sampling.min_indexed_spots:
+                                id_count = collections.Counter(indexed['id'])
+                                break_flag=False
+                                for iid in id_count:
+                                    print ('-----------------XXXXXX------------------', iid, sum(indexed['id']==iid))
+                                    if sum(indexed['id']==iid) <= self.params.iota.random_sub_sampling.min_indexed_spots:
+                                        break_flag=True
+                                        break
+                                if break_flag:
                                     experiments=unrefined_experiments
                                     break
                                 rms=diff_px.norms()
@@ -806,8 +882,10 @@ class Processor_iota(Processor):
                     try:
                         print ('REFINEINGNONE')
                         # DUmp the ensemble indexing solutions for debugging in case
+                        #from IPython import embed; embed(); exit()
+                        #self.known_crystal_models = experiments.crystals()
+                        #experiments, indexed = self.index_with_known_orientation(experiments, observed)
                         if not load_pickle_flag and self.tag is not None:
-                            #from IPython import embed; embed(); exit()
                             dump(self.tag+'_ensemble_exp_list.pickle', copy_of_experiments_list)
                             dump(self.tag+'_ensemble_obs_list.pickle', copy_of_observed_samples_list)
                         experiments,indexed = self.refine(experiments, indexed)
