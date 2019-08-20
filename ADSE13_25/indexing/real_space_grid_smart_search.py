@@ -177,10 +177,10 @@ class indexer_real_space_grid_smart_search(indexer_real_space_grid_search):
       if i > 0:
         for v_u in unique_vectors:
           if v.length() < v_u.length():
-            if is_approximate_integer_multiple(v, v_u, relative_tolerance=0.2, angular_tolerance=2.0):
+            if is_approximate_integer_multiple(v, v_u, relative_tolerance=0.2, angular_tolerance=5.0):
               is_unique = False
               break
-          elif is_approximate_integer_multiple(v_u, v, relative_tolerance=0.2, angular_tolerance=2.0):
+          elif is_approximate_integer_multiple(v_u, v, relative_tolerance=0.2, angular_tolerance=5.0):
             is_unique = False
             break
       if is_unique:
