@@ -5,19 +5,21 @@ logger = logging.getLogger(__name__)
 
 from dials.util import log
 
-debug_handle = log.debug_handle(logger)
-info_handle = log.info_handle(logger)
-
 import libtbx
 from libtbx.utils import Sorry
 
-from dials.algorithms.indexing.indexer import indexer_base
-from dials.algorithms.indexing.known_orientation import indexer_known_orientation
-from dials.algorithms.indexing.real_space_grid_search import indexer_real_space_grid_search
-from exafel_project.ADSE13_25.indexing.real_space_grid_smart_search import indexer_real_space_grid_smart_search
-from dials.algorithms.indexing.fft3d import indexer_fft3d
-from dials.algorithms.indexing.fft1d import indexer_fft1d
+#from dials.algorithms.indexing.indexer import indexer_base
+#from dials.algorithms.indexing.known_orientation import indexer_known_orientation
+#from dials.algorithms.indexing.real_space_grid_search import indexer_real_space_grid_search
+#from exafel_project.ADSE13_25.indexing.real_space_grid_smart_search import indexer_real_space_grid_smart_search
+#from dials.algorithms.indexing.fft3d import indexer_fft3d
+#from dials.algorithms.indexing.fft1d import indexer_fft1d
 from dials_algorithms_indexing_ext import *
+from dials.algorithms.indexing.symmetry import SymmetryHandler
+
+#Aug_Refactor
+from dials.algorithms.indexing.known_orientation import  IndexerKnownOrientation
+from dials.algorithms.indexing.lattice_search import BasisVectorSearch, LatticeSearch
 
 import iotbx.phil # implicit import
 from scitbx import matrix
@@ -28,10 +30,11 @@ from cctbx import crystal
 from dxtbx.model import Crystal
 from dxtbx.model.experiment_list import ExperimentList
 
-from dials.algorithms.indexing.indexer import master_params
-from dials.algorithms.indexing.stills_indexer import stills_indexer
+#from dials.algorithms.indexing.indexer import master_params
+from dials.algorithms.indexing.stills_indexer import StillsIndexer
+import pkg_resources
 
-class iota_indexer(stills_indexer):
+class iota_indexer(StillsIndexer):
 
   def __init__(self, reflections, experiments, params=None):
     '''Init function for iota_indexer is different from indexer_base in that
@@ -43,11 +46,22 @@ class iota_indexer(stills_indexer):
     #stills_indexer.__init__(self, reflections, imagesets, params)
     self.reflections = reflections
     self.experiments = experiments
-    if params is None: params = master_params
+    #if params is None: params = master_params
     self.params = params.indexing
     self.all_params = params
     self.refined_experiments = None
     self.hkl_offset = None
+    #Aug_Refactor
+    #if self.params.index_assignment.method == "local":
+    #  self._assign_indices = assign_indices.AssignIndicesLocal(
+    #    epsilon=self.params.index_assignment.local.epsilon,
+    #    delta=self.params.index_assignment.local.delta,
+    #    l_min=self.params.index_assignment.local.l_min,
+    #    nearest_neighbours=self.params.index_assignment.local.nearest_neighbours)
+    #else:
+    #  self._assign_indices = assign_indices.AssignIndicesGlobal(
+    #    tolerance=self.params.index_assignment.simple.hkl_tolerance)
+    ###
 
     if self.params.refinement_protocol.n_macro_cycles in ('auto', libtbx.Auto):
       self.params.refinement_protocol.n_macro_cycles = 1
@@ -73,15 +87,17 @@ class iota_indexer(stills_indexer):
   def from_parameters(reflections, experiments,
                       known_crystal_models=None, params=None):
     '''Sets up indexer object that will be used for indexing '''
-    if params is None:
-      params = master_params
+#    if params is None:
+#      params = master_params
 
     if known_crystal_models is not None:
       #from dials.algorithms.indexing.known_orientation \
       #     import indexer_known_orientation
+      #idxr = iota_indexer_known_orientation(
+      #  reflections, experiments, params, known_crystal_models)
 
-      idxr = iota_indexer_known_orientation(
-        reflections, experiments, params, known_crystal_models)
+      idxr=IOTA_StillsIndexerKnownOrientation(reflections, experiments, params, known_crystal_models)
+
       #idxr = indexer_known_orientation(
       #  reflections, imagesets, params, known_crystal_models)
     else:
@@ -133,19 +149,26 @@ class iota_indexer(stills_indexer):
     #imagesets.extend(reset_sets)
 
     if known_crystal_models is not None:
-      from dials.algorithms.indexing.known_orientation \
-        import indexer_known_orientation
-      idxr = indexer_known_orientation(
-        reflections, experiments, params, known_crystal_models)
-    elif params.indexing.method == "fft3d":
-      idxr = iota_indexer_fft3d(reflections, experiments, params=params)
-    elif params.indexing.method == "fft1d":
-      idxr = iota_indexer_fft1d(reflections, experiments, params=params)
-    elif params.indexing.method == "real_space_grid_search":
-      idxr = iota_indexer_real_space_grid_search(reflections, experiments, params=params)
-    elif params.indexing.method == "real_space_grid_smart_search":
-      idxr = iota_indexer_real_space_grid_smart_search(reflections, experiments, params=params)
-    return idxr
+      print ('Known Orientation Indexing')
+      return idxr
+      #from dials.algorithms.indexing.known_orientation \
+      #  import indexer_known_orientation
+      #idxr = indexer_known_orientation(
+      #  reflections, experiments, params, known_crystal_models)
+    for entry_point in pkg_resources.iter_entry_points("dials.index.basis_vector_search_strategy"):
+      if params.indexing.method==entry_point.name:
+        idxr=IOTA_StillsIndexerBasisVectorSearch(reflections, experiments, params=params)
+        return idxr
+          
+    #elif params.indexing.method == "fft3d":
+    #  idxr = iota_indexer_fft3d(reflections, experiments, params=params)
+    #elif params.indexing.method == "fft1d":
+    #  idxr = iota_indexer_fft1d(reflections, experiments, params=params)
+    #elif params.indexing.method == "real_space_grid_search":
+    #  idxr = iota_indexer_real_space_grid_search(reflections, experiments, params=params)
+    #elif params.indexing.method == "real_space_grid_smart_search":
+    #  idxr = iota_indexer_real_space_grid_smart_search(reflections, experiments, params=params)
+    #return idxr
 
   def index(self, provided_experiments=None,debug=False):
     ''' This step does  1. find_lattices (via a method like fft1d)
@@ -186,6 +209,11 @@ class iota_indexer(stills_indexer):
       self.index_reflections(experiments, self.reflections, debug=debug)
 
       # Housekeeping. Apply symmetry
+      self._apply_symmetry_post_indexing(experiments, self.reflections, n_lattices_previous_cycle) 
+
+      # Aug_Refactor :: probably unnecessary to remove stuff below but still doing so to adapt to new style
+      # Never mind, might keep it to have IOTA stuff working
+      '''
       target_space_group = self.target_symmetry_primitive.space_group()
       for i_cryst, cryst in enumerate(experiments.crystals()):
         if i_cryst >= n_lattices_previous_cycle:
@@ -222,9 +250,13 @@ class iota_indexer(stills_indexer):
               from scitbx.matrix import sqr
               hklfrac=flex.mat3_double(len(miller_indices), sqr(cryst.get_A()).inverse())*self.reflections['rlp'].select(self.reflections['id']==i_expt)
               self.reflections['fractional_miller_index'].set_selected(self.reflections['id']==i_expt, hklfrac)
+    '''
 
-      # Discard nearly overlapping lattices
+    logger.info("\nIndexed crystal models:")  
+    self.show_experiments(experiments, self.reflections, d_min=self.d_min)
 
+    # Discard nearly overlapping lattices
+    # difference_rotation_matrix_axis_angle function is there still in DIALS 2.0 so no need to change anything below 
     if len(experiments) > 1:
       from dials.algorithms.indexing.compare_orientation_matrices \
         import difference_rotation_matrix_axis_angle
@@ -252,6 +284,8 @@ class iota_indexer(stills_indexer):
   def index_reflections(self, experiments, reflections,debug=False):
     ''' Assigns hkl values to reflections'''
 
+    # Not needed below as I call assign_hkl_to_reflections
+    #self._assign_indices(reflections, experiments, d_min=self.d_min)
     params_simple = self.params.index_assignment.simple
     self.assign_hkl_to_reflections(reflections, experiments, self.d_min,
                       tolerance = params_simple.hkl_tolerance, debug=debug)
@@ -331,24 +365,63 @@ class iota_indexer(stills_indexer):
     reflections = ref_predictor(reflections)
     reflections['id'].set_selected(flex.size_t(range(len(reflections))), -1)
 
+    def _apply_symmetry_post_indexing(self, experiments, reflections, n_lattices_previous_cycle):
+      # Taken from DIALS post Aug_Refactor
+      # now apply the space group symmetry only after the first indexing
+      # need to make sure that the symmetrized orientation is similar to the P1 model
+      for cryst in experiments.crystals()[n_lattices_previous_cycle:]:
+        new_cryst, cb_op_to_primitive = self._symmetry_handler.apply_symmetry(cryst)
+        if self._symmetry_handler.cb_op_primitive_inp is not None:
+            new_cryst = new_cryst.change_basis(self._symmetry_handler.cb_op_primitive_inp)
+        cryst.update(new_cryst)
+        cryst.set_space_group(self.params.known_symmetry.space_group.group())
+        for i_expt, expt in enumerate(experiments):
+            if expt.crystal is not cryst:
+                continue
+            if not cb_op_to_primitive.is_identity_op():
+                miller_indices = reflections["miller_index"].select(reflections["id"] == i_expt)
+                miller_indices = cb_op_to_primitive.apply(miller_indices)
+                reflections["miller_index"].set_selected(reflections["id"] == i_expt, miller_indices)
+            if self._symmetry_handler.cb_op_primitive_inp is not None:
+                miller_indices = reflections["miller_index"].select(reflections["id"] == i_expt)
+                miller_indices = self._symmetry_handler.cb_op_primitive_inp.apply(miller_indices)
+                reflections["miller_index"].set_selected(reflections["id"] == i_expt, miller_indices)
+                # IOTA
+                from scitbx.matrix import sqr
+                hklfrac=flex.mat3_double(len(miller_indices), sqr(cryst.get_A()).inverse())*self.reflections['rlp'].select(self.reflections['id']==i_expt)
+                self.reflections['fractional_miller_index'].set_selected(self.reflections['id']==i_expt, hklfrac)
 
 
+class IOTA_StillsIndexerKnownOrientation(IndexerKnownOrientation, iota_indexer):
+    pass
 
-class iota_indexer_fft1d(iota_indexer, indexer_fft1d):
-  '''Mixin class with fft1d and iota_indexer way of identifying indexing solutions'''
-  pass
 
-class iota_indexer_real_space_grid_search(iota_indexer, indexer_real_space_grid_search):
-  '''Mixin class with real_space_grid_search and iota_indexer way of identifying indexing solutions'''
-  pass
+class IOTA_StillsIndexerBasisVectorSearch(iota_indexer, BasisVectorSearch):
+    def __init__(self, reflections, experiments, params):
+      BasisVectorSearch.__init__(self,reflections, experiments, params)
+      iota_indexer.__init__(self,reflections, experiments, params)
+    #pass
 
-class iota_indexer_real_space_grid_smart_search(iota_indexer, indexer_real_space_grid_smart_search):
-  '''Mixin class with real_space_grid_smart_search and iota_indexer way of identifying indexing solutions'''
-  pass
 
-class iota_indexer_fft3d(iota_indexer, indexer_fft3d):
-  '''Mixin class with fft3d and iota_indexer way of identifying indexing solutions'''
-  pass
+class IOTA_StillsIndexerLatticeSearch(iota_indexer, LatticeSearch):
+    pass
 
-class iota_indexer_known_orientation(indexer_known_orientation, iota_indexer):
-  pass
+## Post refactor
+#class iota_indexer_fft1d(iota_indexer, indexer_fft1d):
+#  '''Mixin class with fft1d and iota_indexer way of identifying indexing solutions'''
+#  pass
+#
+#class iota_indexer_real_space_grid_search(iota_indexer, indexer_real_space_grid_search):
+#  '''Mixin class with real_space_grid_search and iota_indexer way of identifying indexing solutions'''
+#  pass
+#
+#class iota_indexer_real_space_grid_smart_search(iota_indexer, indexer_real_space_grid_smart_search):
+#  '''Mixin class with real_space_grid_smart_search and iota_indexer way of identifying indexing solutions'''
+#  pass
+#
+#class iota_indexer_fft3d(iota_indexer, indexer_fft3d):
+#  '''Mixin class with fft3d and iota_indexer way of identifying indexing solutions'''
+#  pass
+#
+#class iota_indexer_known_orientation(indexer_known_orientation, iota_indexer):
+#  pass

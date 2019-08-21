@@ -501,7 +501,6 @@ class Processor_iota(Processor):
                         try:
                             print ('IOTA: SUM_INTENSITY_VALUE',sum(observed_sample['intensity.sum.value']), ' ',trial, len(observed_sample))
                             if self.params.iota.random_sub_sampling.finalize_method == 'union_and_reindex':
-                                #import pdb; pdb.set_trace()
                                 experiments_tmp, indexed_tmp = self.index_with_iota(experiments, observed_sample)
                                 for ii,expt_tmp in enumerate(experiments_tmp):
                                     expt_id +=1

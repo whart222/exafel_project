@@ -230,10 +230,14 @@ class clustering_manager(group_args):
       product_list_of_ranks[iid_sorted[0]]=0.0 # set this to 0.0 so that the mean/stdev does not get biased by one point
       stdev=np.std(product_list_of_ranks)
       mean=np.mean(product_list_of_ranks)
+      n_sorted=3
+      if stdev == 0.0:
+        n_sorted=1
+      
       z_critical = 3.0 # 2 sigma significance ?
       # Only go through say 3-4 datapoints 
       # basically there won't be more than 2-3 lattices on an image realistically
-      for iid in iid_sorted[1:3]:
+      for iid in iid_sorted[1:n_sorted]:
         z_score=(product_list_of_ranks[iid]-mean)/stdev
         if z_score > z_critical:
           cluster_id[iid]=n_cluster
@@ -413,7 +417,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         #exit()
         A_direct = sqr(crystal_orientation_list[i].reciprocal_matrix()).transpose().inverse()
         all_A.append(A_direct[0])
-        #print ("Direct A matrix 1st element = %12.6f %12.6f %12.6f"%(A_direct[0], A_direct[1], A_direct[2]))
+        print ("Direct A matrix 1st element = %12.6f %12.6f %12.6f"%(A_direct[0], A_direct[1], A_direct[2]))
     #  exit()
     CM_mapping = {}
     for i in range(len(experiments_list)):
@@ -452,7 +456,6 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
       #else:
       #d_c_ori=flex.mean_and_variance(Dij_ori[cluster].as_1d()).unweighted_sample_standard_deviation()
       print ('d_c_ori=',d_c_ori)
-      #import pdb; pdb.set_trace()
       CM_ori = clustering_manager(Dij=Dij_ori[cluster], d_c=d_c_ori, max_percentile_rho=clustering_params.max_percentile_rho_ori, Z_delta=clustering_params.Z_delta, strategy='strategy_3')
       n_cluster_ori = 1+flex.max(CM_ori.cluster_id_final)
       #from IPython import embed; embed(); exit()

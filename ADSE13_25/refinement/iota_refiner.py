@@ -5,10 +5,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 from dials.util import log
-
-debug_handle = log.debug_handle(logger)
-info_handle = log.info_handle(logger)
-
 from libtbx.utils import Sorry
 from libtbx.phil import parse
 
@@ -18,7 +14,7 @@ import iotbx.phil # implicit import
 
 from dials.array_family import flex
 from cctbx import crystal
-from dials.algorithms.indexing.stills_indexer import stills_indexer
+from dials.algorithms.indexing.stills_indexer import StillsIndexer
 
 
 iota_refiner_phil_str = '''
@@ -35,9 +31,9 @@ iota_refiner_scope = parse(iota_refiner_phil_str)
 
 
 
-class iota_refiner(stills_indexer):
+class iota_refiner(StillsIndexer):
   ''' Class for doing refinement and outlier rejection after iota indexing is done
-      Although this class subclasses stills_indexer, it should never be used for any
+      Although this class subclasses StillsIndexer, it should never be used for any
       iota related indexing. There is a separate class for that.'''
   def __init__ (self, reflections, experiments, params):
     self.all_params = params
@@ -45,7 +41,7 @@ class iota_refiner(stills_indexer):
     self.experiments = experiments
 
   def run_refinement_and_outlier_rejection(self):
-    ''' Code taken from the index function of stills_indexer '''
+    ''' Code taken from the index function of StillsIndexer '''
     self.d_min = self.all_params.indexing.refinement_protocol.d_min_start
     self.indexed_reflections = (self.reflections['id'] > -1)
     if self.d_min is None:
@@ -140,9 +136,11 @@ class iota_refiner(stills_indexer):
         filtered_refined_reflections.extend(subset)
       self.refined_reflections = filtered_refined_reflections
 
-    if len(self.refined_experiments) > 1:
-      from dials.algorithms.indexing.compare_orientation_matrices \
-           import show_rotation_matrix_differences
+    #if len(self.refined_experiments) > 1:
+      #Aug_refactor  --> import is now rotation_matrix_differences but unused
+      # hence commenting it out
+      #from dials.algorithms.indexing.compare_orientation_matrices \
+      #     import show_rotation_matrix_differences
       # FIXME
       #show_rotation_matrix_differences(
       #  self.refined_experiments.crystals(), out=info_handle)
