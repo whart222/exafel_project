@@ -231,8 +231,8 @@ class clustering_manager(group_args):
       stdev=np.std(product_list_of_ranks)
       mean=np.mean(product_list_of_ranks)
       n_sorted=3
-      if stdev == 0.0:
-        n_sorted=1
+      #if stdev == 0.0:
+      #  n_sorted=1
       
       z_critical = 3.0 # 2 sigma significance ?
       # Only go through say 3-4 datapoints 
@@ -417,7 +417,7 @@ def get_uc_consensus(experiments_list, show_plot=False, save_plot=False, return_
         #exit()
         A_direct = sqr(crystal_orientation_list[i].reciprocal_matrix()).transpose().inverse()
         all_A.append(A_direct[0])
-        print ("Direct A matrix 1st element = %12.6f %12.6f %12.6f"%(A_direct[0], A_direct[1], A_direct[2]))
+        #print ("Direct A matrix 1st element = %12.6f %12.6f %12.6f"%(A_direct[0], A_direct[1], A_direct[2]))
     #  exit()
     CM_mapping = {}
     for i in range(len(experiments_list)):
