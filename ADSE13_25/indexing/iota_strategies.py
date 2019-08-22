@@ -55,9 +55,12 @@ class RealSpaceGridSmartSearch(Strategy):
     super(RealSpaceGridSmartSearch, self).__init__(max_cell, params=params, *args, **kwargs)
     self._target_unit_cell = target_unit_cell
 
-  def get_finegrained_SST(self, reciprocal_lattice_vectors, coarse_sampling_grid=0.005):
+  def get_finegrained_SST(self, reciprocal_lattice_vectors):
     from rstbx.array_family import flex
     from rstbx.dps_core import SimpleSamplerTool
+    coarse_sampling_grid=self._params.coarse_sampling_grid
+    fine_sampling_grid=self._params.fine_sampling_grid
+    print ('Grid sizes being used :: Coarse = %.6f Fine=%.6f'%(coarse_sampling_grid, fine_sampling_grid))
     used_in_indexing = flex.bool(reciprocal_lattice_vectors.size(), True)
     print("Indexing from %i reflections COARSE" % used_in_indexing.count(True))
     #d_min = self.params.refinement_protocol.d_min_start
@@ -121,7 +124,8 @@ class RealSpaceGridSmartSearch(Strategy):
     for v in unique_indices:
       direction=SST.angles[v//len(unique_cell_dimensions)]
       SST_filter.append(direction)
-    SST.construct_hemisphere_grid_finegrained(0.0001, coarse_sampling_grid, SST_filter)
+
+    SST.construct_hemisphere_grid_finegrained(fine_sampling_grid, coarse_sampling_grid, SST_filter)
     return SST
 
   def find_basis_vectors(self, reciprocal_lattice_vectors):

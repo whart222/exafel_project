@@ -227,7 +227,7 @@ class clustering_manager(group_args):
       cluster_id[iid_sorted[0]]=n_cluster # first point always a cluster
       n_cluster +=1
       print ('CLUSTERING_STATS S3',iid_sorted[0],cluster_id[iid_sorted[0]])
-      product_list_of_ranks[iid_sorted[0]]=0.0 # set this to 0.0 so that the mean/stdev does not get biased by one point
+      #product_list_of_ranks[iid_sorted[0]]=0.0 # set this to 0.0 so that the mean/stdev does not get biased by one point
       stdev=np.std(product_list_of_ranks)
       mean=np.mean(product_list_of_ranks)
       n_sorted=3
