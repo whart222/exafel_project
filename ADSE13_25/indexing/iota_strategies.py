@@ -24,9 +24,11 @@ from dials_algorithms_indexing_ext import map_centroids_to_reciprocal_space_grid
 from dials.algorithms.indexing import DialsIndexError
 
 # Import all the stuff in strategies and then write RealSpaceGridSmartSearch strategy
-from dials.algorithms.indexing.basis_vector_search.strategies import Strategy, FFT1D, FFT3D, RealSpaceGridSearch
-from dials.algorithms.indexing.basis_vector_search.strategies import _vector_group, _is_approximate_integer_multiple
-from dials.algorithms.indexing.basis_vector_search.strategies import fft1d_phil_str, fft3d_phil_str, real_space_grid_search_phil_str
+from dials.algorithms.indexing.basis_vector_search import Strategy, FFT1D, FFT3D, RealSpaceGridSearch
+from dials.algorithms.indexing.basis_vector_search.utils import is_approximate_integer_multiple
+from dials.algorithms.indexing.basis_vector_search.fft1d import fft1d_phil_str
+from dials.algorithms.indexing.basis_vector_search.fft3d import fft3d_phil_str
+from dials.algorithms.indexing.basis_vector_search.real_space_grid_search import real_space_grid_search_phil_str
 
 
 def compute_functional(vector, reciprocal_lattice_vectors):
@@ -108,10 +110,10 @@ class RealSpaceGridSmartSearch(Strategy):
       if i > 0:
         for v_u in unique_vectors:
           if v.length() < v_u.length():
-            if _is_approximate_integer_multiple(v, v_u, relative_tolerance=0.2, angular_tolerance=5.0):
+            if is_approximate_integer_multiple(v, v_u, relative_length_tolerance=0.2, angular_tolerance=5.0):
               is_unique = False
               break
-          elif _is_approximate_integer_multiple(v_u, v, relative_tolerance=0.2, angular_tolerance=5.0):
+          elif is_approximate_integer_multiple(v_u, v, relative_length_tolerance=0.2, angular_tolerance=5.0):
             is_unique = False
             break
       if is_unique:
@@ -200,10 +202,10 @@ class RealSpaceGridSmartSearch(Strategy):
       if i > 0:
         for v_u in unique_vectors:
           if v.length() < v_u.length():
-            if _is_approximate_integer_multiple(v, v_u, relative_tolerance=0.2, angular_tolerance=2.0):
+            if is_approximate_integer_multiple(v, v_u, relative_length_tolerance=0.2, angular_tolerance=2.0):
               is_unique = False
               break
-          elif _is_approximate_integer_multiple(v_u, v, relative_tolerance=0.2, angular_tolerance=2.0):
+          elif is_approximate_integer_multiple(v_u, v, relative_length_tolerance=0.2, angular_tolerance=2.0):
             is_unique = False
             break
       if is_unique:

@@ -155,7 +155,7 @@ class iota_indexer(StillsIndexer):
       #  import indexer_known_orientation
       #idxr = indexer_known_orientation(
       #  reflections, experiments, params, known_crystal_models)
-    for entry_point in pkg_resources.iter_entry_points("dials.index.basis_vector_search_strategy"):
+    for entry_point in pkg_resources.iter_entry_points("dials.index.basis_vector_search"):
       if params.indexing.method==entry_point.name:
         idxr=IOTA_StillsIndexerBasisVectorSearch(reflections, experiments, params=params)
         return idxr
