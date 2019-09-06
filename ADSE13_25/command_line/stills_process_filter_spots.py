@@ -154,7 +154,7 @@ class Script_iota(Script):
 
         # Configure logging
         log.config(
-            params.verbosity, info="dials.process.log", debug="dials.process.debug.log"
+            verbosity=options.verbose, info="dials.process.log", debug="dials.process.debug.log"
         )
 
         bad_phils = [f for f in all_paths if os.path.splitext(f)[1] == ".phil"]
@@ -352,7 +352,7 @@ class Script_iota(Script):
 
             from dials.util import log
 
-            log.config(params.verbosity, info=info_path, debug=debug_path)
+            log.config(options.verbose, info=info_path, debug=debug_path)
 
             subset = [item for i, item in enumerate(iterable) if (i + rank) % size == 0]
             do_work(rank, subset)
