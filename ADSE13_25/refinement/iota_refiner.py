@@ -15,6 +15,7 @@ import iotbx.phil # implicit import
 from dials.array_family import flex
 from cctbx import crystal
 from dials.algorithms.indexing.stills_indexer import StillsIndexer
+from dxtbx.model.experiment_list import ExperimentList
 
 
 iota_refiner_phil_str = '''
@@ -116,7 +117,8 @@ class iota_refiner(StillsIndexer):
       self.reflections = flex.reflection_table()
       for i, expt in enumerate(self.experiments):
         spots_sel = spots_mm.select(spots_mm["imageset_id"] == i)
-        spots_sel.map_centroids_to_reciprocal_space(expt.detector, expt.beam, expt.goniometer)
+        #spots_sel.map_centroids_to_reciprocal_space(expt.detector, expt.beam, expt.goniometer)
+        spots_sel.map_centroids_to_reciprocal_space(self.experiments[i:i+1])
         self.reflections.extend(spots_sel)
 
     # update for next cycle

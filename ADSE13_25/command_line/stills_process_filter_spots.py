@@ -911,7 +911,7 @@ class Processor_iota(Processor):
                         # Now go through the spots indexed by the cluster center and reject if dh greater than Z_cutoff
                         indexed_spots_idx = []
                         print ('MILLER_INDEX_DH_STATS', ' (H, K, L)', ' ', ' delta_H ','     ','delta_H_cutoff','   ','resolution')
-                        for ii,refl in enumerate(indexed_centroid):
+                        for ii,refl in enumerate(indexed_centroid.rows()):
                             print ('MOMENT_OF_TRUTH_',ii)
                             refl_ensemble=all_indexed_tmp.select(all_indexed_tmp['xyzobs.mm.value'].is_equal_to_vec3_double(refl['xyzobs.mm.value']))
                             # First ensure that the miller_index of the centroid is the majority in the refl_ensemble
