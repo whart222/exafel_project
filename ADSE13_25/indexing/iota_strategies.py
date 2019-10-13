@@ -33,7 +33,8 @@ from dials.algorithms.indexing.basis_vector_search.real_space_grid_search import
 
 def compute_functional(vector, reciprocal_lattice_vectors):
   two_pi_S_dot_v = 2 * math.pi * reciprocal_lattice_vectors.dot(vector)
-  cosines = flex.cos(two_pi_S_dot_v)
+  #cosines = flex.cos(two_pi_S_dot_v)
+  #from IPython import embed; embed(); exit()
   return flex.sum(flex.cos(two_pi_S_dot_v))
 
 real_space_grid_smart_search_phil_str = """\
@@ -85,17 +86,24 @@ class RealSpaceGridSmartSearch(Strategy):
     vectors = flex.vec3_double()
     function_values = flex.double()
     import time
-    time1=time.time()
     SST_all_angles = flex.Direction()
-    for i, direction in enumerate(SST.angles):
-      for l in unique_cell_dimensions:
-        v = matrix.col(direction.dvec) * l
-        f = compute_functional(v.elems, reciprocal_lattice_vectors)
-        vectors.append(v.elems)
-        function_values.append(f)
-        SST_all_angles.append(direction)
+    # C++ function should be like this
+    time1=time.time()
+    vectors, function_values, SST_all_angles = SST.coarse_grid_search_cpp(SST.angles, flex.double(list(unique_cell_dimensions)), reciprocal_lattice_vectors)
     time2=time.time()
-    print ('COARSE GRID SEARCH TIME=',time2-time1)
+    print ('COARSE GRID SEARCH TIME CPP =',time2-time1)
+    # Commenting out original python code below. Above C++ version atleast 10x faster
+    #time1=time.time()
+    #for i, direction in enumerate(SST.angles):
+    #  for l in unique_cell_dimensions:
+    #    v = matrix.col(direction.dvec) * l
+    #    f = compute_functional(v.elems, reciprocal_lattice_vectors)
+    #    vectors.append(v.elems)
+    #    function_values.append(f)
+    #    SST_all_angles.append(direction)
+    #time2=time.time()
+    #print ('COARSE GRID SEARCH TIME=',time2-time1)
+    #from IPython import embed; embed(); exit()
 
     perm = flex.sort_permutation(function_values, reverse=True)
     vectors = vectors.select(perm)
