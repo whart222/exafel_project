@@ -167,23 +167,25 @@ class RealSpaceGridSmartSearch(Strategy):
     import time
     time1=time.time()
     if find_max_within_cluster:
-      top_n_values=1 # number of top scoring vectors to return in each coarse grid per unique dimension
-      for count in range(len(SST.n_entries_finegrained[:-1])):
-        start=SST.n_entries_finegrained[count]
-        end=SST.n_entries_finegrained[count+1]
-        for l in unique_cell_dimensions:
-          tmp_vectors = flex.vec3_double()
-          tmp_function_values = flex.double()
-          for i, direction in enumerate(SST.finegrained_angles[start:end]):
-            v = matrix.col(direction.dvec) * l
-            f = compute_functional(v.elems, reciprocal_lattice_vectors)
-            tmp_vectors.append(v.elems)
-            tmp_function_values.append(f)
-          perm=flex.sort_permutation(tmp_function_values, reverse=True)
-          tmp_vectors=tmp_vectors.select(perm)[0:top_n_values]
-          tmp_function_values=tmp_function_values.select(perm)[0:top_n_values]
-          vectors.extend(tmp_vectors)
-          function_values.extend(tmp_function_values)
+      # C++ version
+      vectors, function_values = SST.fine_grid_search_cpp(SST.finegrained_angles, flex.double(list(unique_cell_dimensions)), reciprocal_lattice_vectors )
+      #top_n_values=1 # number of top scoring vectors to return in each coarse grid per unique dimension
+      #for count in range(len(SST.n_entries_finegrained[:-1])):
+      #  start=SST.n_entries_finegrained[count]
+      #  end=SST.n_entries_finegrained[count+1]
+      #  for l in unique_cell_dimensions:
+      #    tmp_vectors = flex.vec3_double()
+      #    tmp_function_values = flex.double()
+      #    for i, direction in enumerate(SST.finegrained_angles[start:end]):
+      #      v = matrix.col(direction.dvec) * l
+      #      f = compute_functional(v.elems, reciprocal_lattice_vectors)
+      #      tmp_vectors.append(v.elems)
+      #      tmp_function_values.append(f)
+      #    perm=flex.sort_permutation(tmp_function_values, reverse=True)
+      #    tmp_vectors=tmp_vectors.select(perm)[0:top_n_values]
+      #    tmp_function_values=tmp_function_values.select(perm)[0:top_n_values]
+      #    vectors.extend(tmp_vectors)
+      #    function_values.extend(tmp_function_values)
 
     else:
       for i, direction in enumerate(SST.finegrained_angles):
