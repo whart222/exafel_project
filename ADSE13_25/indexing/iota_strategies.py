@@ -44,6 +44,9 @@ coarse_sampling_grid = 0.005
 fine_sampling_grid = 0.0001
   .type=float(value_min=0)
   .help=fine sampling grid that further expands around the top basis vectors identified in the coarse grid search
+use_openmp = False
+  .type=bool
+  .help = if enabled, uses openmp version of the coarse and fine grid search. Right now works best on KNL architectures
 """
 
 
@@ -88,10 +91,16 @@ class RealSpaceGridSmartSearch(Strategy):
     import time
     SST_all_angles = flex.Direction()
     # C++ function should be like this
-    time1=time.time()
-    vectors, function_values, SST_all_angles = SST.coarse_grid_search_cpp(SST.angles, flex.double(list(unique_cell_dimensions)), reciprocal_lattice_vectors)
-    time2=time.time()
-    print ('COARSE GRID SEARCH TIME CPP =',time2-time1)
+    if self._params.use_openmp:
+      time1=time.time()
+      vectors, function_values, SST_all_angles = SST.coarse_grid_search_openmp_cpp(SST.angles, flex.double(list(unique_cell_dimensions)), reciprocal_lattice_vectors)
+      time2=time.time()
+      print ('COARSE GRID SEARCH TIME OMP_CPP =',time2-time1)
+    else:
+      time1=time.time()
+      vectors, function_values, SST_all_angles = SST.coarse_grid_search_cpp(SST.angles, flex.double(list(unique_cell_dimensions)), reciprocal_lattice_vectors)
+      time2=time.time()
+      print ('COARSE GRID SEARCH TIME REGULAR_CPP =',time2-time1)
     # Commenting out original python code below. Above C++ version atleast 10x faster
     #time1=time.time()
     #for i, direction in enumerate(SST.angles):
@@ -165,10 +174,18 @@ class RealSpaceGridSmartSearch(Strategy):
     # Do a search within the cluster of coarse grids and only return the top few values ?
     find_max_within_cluster=True
     import time
-    time1=time.time()
     if find_max_within_cluster:
       # C++ version
-      vectors, function_values = SST.fine_grid_search_cpp(SST.finegrained_angles, flex.double(list(unique_cell_dimensions)), reciprocal_lattice_vectors )
+      if self._params.use_openmp:
+        time1=time.time()
+        vectors, function_values = SST.fine_grid_search_openmp_cpp(SST.finegrained_angles, flex.double(list(unique_cell_dimensions)), reciprocal_lattice_vectors )
+        time2=time.time()
+        print ('FINE GRID SEARCH TIME OMP_CPP =',time2-time1)
+      else:
+        time1=time.time()
+        vectors, function_values = SST.fine_grid_search_cpp(SST.finegrained_angles, flex.double(list(unique_cell_dimensions)), reciprocal_lattice_vectors )
+        time2=time.time()
+        print ('FINE GRID SEARCH TIME REGULAR_CPP =',time2-time1)
       #top_n_values=1 # number of top scoring vectors to return in each coarse grid per unique dimension
       #for count in range(len(SST.n_entries_finegrained[:-1])):
       #  start=SST.n_entries_finegrained[count]
@@ -195,8 +212,6 @@ class RealSpaceGridSmartSearch(Strategy):
           vectors.append(v.elems)
           function_values.append(f)
      
-    time2=time.time()
-    print ('FINE GRID SEARCH TIME=',time2-time1)
 
     perm = flex.sort_permutation(function_values, reverse=True)
     vectors = vectors.select(perm)
