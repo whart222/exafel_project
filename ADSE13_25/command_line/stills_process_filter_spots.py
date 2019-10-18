@@ -3,6 +3,7 @@ from six.moves import range
 
 import logging
 import os
+import sys
 import math
 import collections
 
@@ -153,9 +154,9 @@ class Script_iota(Script):
         st = time()
 
         # Configure logging
-        log.config(
-            verbosity=options.verbose, info="dials.process.log", debug="dials.process.debug.log"
-        )
+        #log.config(
+        #    verbosity=options.verbose, info="dials.process.log", debug="dials.process.debug.log"
+        #)
 
         bad_phils = [f for f in all_paths if os.path.splitext(f)[1] == ".phil"]
         if len(bad_phils) > 0:
@@ -261,11 +262,20 @@ class Script_iota(Script):
                 for filename in all_paths
             ]
             tags = []
+            all_paths2 = []
             for i, basename in enumerate(basenames):
                 if basenames.count(basename) > 1:
-                    tags.append("%s_%05d" % (basename, i))
+                    tag = "%s_%05d" % (basename, i)
                 else:
-                    tags.append(basename)
+                    tag = basename
+                if (
+                    not self.params.input.image_tag
+                    or tag in self.params.input.image_tag
+                ):
+                    tags.append(tag)
+                    all_paths2.append(all_paths[i])
+            all_paths = all_paths2
+
 
             # Wrapper function
             def do_work(i, item_list):
@@ -312,11 +322,11 @@ class Script_iota(Script):
                     processor.process_experiments(tag, experiments)
                 processor.finalize()
 
-            iterable = zip(tags, all_paths)
-
+            iterable = list(zip(tags, all_paths))
 
         # Process the data
         # Process the data
+
         if params.mp.method == "mpi":
             from mpi4py import MPI
 
@@ -326,11 +336,8 @@ class Script_iota(Script):
 
             # Configure the logging
             if params.output.logging_dir is None:
-                info_path = ""
-                debug_path = ""
+                logfile = None
             else:
-                import sys
-
                 log_path = os.path.join(
                     params.output.logging_dir, "log_rank%04d.out" % rank
                 )
@@ -343,19 +350,50 @@ class Script_iota(Script):
                 sys.stderr = open(error_path, "a", buffering=0)
                 print("Should be redirected now")
 
-                info_path = os.path.join(
+                logfile = os.path.join(
                     params.output.logging_dir, "info_rank%04d.out" % rank
                 )
-                debug_path = os.path.join(
-                    params.output.logging_dir, "debug_rank%04d.out" % rank
-                )
 
-            from dials.util import log
+            log.config(verbosity=options.verbose, logfile=logfile)
 
-            log.config(options.verbose, info=info_path, debug=debug_path)
-
-            subset = [item for i, item in enumerate(iterable) if (i + rank) % size == 0]
-            do_work(rank, subset)
+            if size <= 2:  # client/server only makes sense for n>2
+                subset = [item for i, item in enumerate(iterable) if (i + rank) % size == 0]
+                do_work(rank, subset)
+            else:
+                if rank == 0:
+                    # server process
+                    for item in iterable:
+                        print("Getting next available process")
+                        rankreq = comm.recv(source=MPI.ANY_SOURCE)
+                        print("Process %s is ready, sending %s\n" % (rankreq, item[0]))
+                        comm.send(item, dest=rankreq)
+                    # send a stop command to each process
+                    print("MPI DONE, sending stops\n")
+                    for rankreq in range(size - 1):
+                        rankreq = comm.recv(source=MPI.ANY_SOURCE)
+                        print("Sending stop to %d\n" % rankreq)
+                        comm.send("endrun", dest=rankreq)
+                    print("All stops sent.")
+                else:
+                    # client process
+                    while True:
+                        # inform the server this process is ready for an event
+                        print("Rank %d getting next task" % rank)
+                        comm.send(rank, dest=0)
+                        print("Rank %d waiting for response" % rank)
+                        item = comm.recv(source=0)
+                        if item == "endrun":
+                            print("Rank %d received endrun" % rank)
+                            break
+                        print("Rank %d beginning processing" % rank)
+                        try:
+                            do_work(rank, [item])
+                        except Exception as e:
+                            print(
+                                "Rank %d unhandled exception processing event" % rank,
+                                str(e),
+                            )
+                        print("Rank %d event processed" % rank)
         else:
             from dxtbx.command_line.image_average import splitit
 
