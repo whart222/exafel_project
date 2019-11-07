@@ -17,7 +17,7 @@ set -e
  rm -rf test
  mkdir test
  pushd test
-   # The number of processes, nproc, should be chosen depending how many tests are run - see LS49/run_tests.py 
+   # The number of processes, nproc, should depend on how many tests are enabled in LS49/run_tests.py 
    libtbx.run_tests_parallel module=LS49 nproc=12
  popd
 
