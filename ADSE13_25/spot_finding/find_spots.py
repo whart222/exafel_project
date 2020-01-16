@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
 import logging
-import os
+import os, glob
 logger = logging.getLogger('exafel.find_spots')
 from dxtbx.model.experiment_list import ExperimentListFactory, ExperimentList, ExperimentListDumper
 from dials.algorithms.spot_prediction import StillsReflectionPredictor
@@ -27,7 +27,9 @@ LS49 {
     .help = path to crystal models that were indexed using the rayonix data.Should only be a path \
             Eg. /my/path/to/rayonix_models/ \
             Where the folder contains all the integrated_experiments.json files from the rayonix analysis \
-            Note that this option should be provided if predict_spots is True 
+            Note that this option should be provided if predict_spots is True \ 
+            Update 15th Jan, 2020 --> Also using this to figure out timestamps for dumping CBFs \
+            Folder should contain list of int-x files
   path_to_jungfrau_detector_model = None
     .type = str
     .help = path to jungfrau detector models that were indexed. Should be path to the experiment file including the file itself\
@@ -115,9 +117,9 @@ class SpotFinding_Script(Script):
         st = time()
 
         # Configure logging
-        log.config(
-            params.verbosity, info="exafel_spotfinding.process.log", debug="exafel.spot_finding.debug.log"
-        )
+        #log.config(
+        #    params.verbosity, info="exafel_spotfinding.process.log", debug="exafel.spot_finding.debug.log"
+        #)
 
         bad_phils = [f for f in all_paths if os.path.splitext(f)[1] == ".phil"]
         if len(bad_phils) > 0:
@@ -185,11 +187,15 @@ class SpotFinding_Script(Script):
                     print ('READING IN TIMESTAMPS TO DUMP')
                     # Read in file with timestamps information
                     processor.timestamps_to_dump = []
-                    with open(os.path.join(self.params.output.output_dir,'../timestamps_to_dump.dat'), 'r') as fin:
-                        for line in fin:
-                            if line !='\n':
-                                ts = line.split()[0].strip()
-                                processor.timestamps_to_dump.append(ts)
+                    for fin in glob.glob(os.path.join(self.params.LS49.path_to_rayonix_crystal_models, 'int-0-*')):
+                      int_file=os.path.basename(fin)
+                      ts = int_file[6:23] 
+                      processor.timestamps_to_dump.append(ts)
+                    #with open(os.path.join(self.params.output.output_dir,'../timestamps_to_dump.dat'), 'r') as fin:
+                    #    for line in fin:
+                    #        if line !='\n':
+                    #            ts = line.split()[0].strip()
+                    #            processor.timestamps_to_dump.append(ts)
 
                 from dials.array_family import flex
                 all_spots_from_rank = flex.reflection_table()
@@ -475,9 +481,9 @@ def custom_stats_imageset(imageset, reflections, resolution_analysis=False, plot
 
 
 if __name__ == '__main__':
-    from dials.util import halraiser
+    #with dials.util.show_mail_on_error():
     try:
         script = SpotFinding_Script()
         script.run()
     except Exception as e:
-        halraiser(e)
+        print (e)
