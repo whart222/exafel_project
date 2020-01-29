@@ -3,7 +3,7 @@ from __future__ import absolute_import, division, print_function
 import logging
 import os, glob
 logger = logging.getLogger('exafel.find_spots')
-from dxtbx.model.experiment_list import ExperimentListFactory, ExperimentList, ExperimentListDumper
+from dxtbx.model.experiment_list import ExperimentListFactory, ExperimentList
 from dials.algorithms.spot_prediction import StillsReflectionPredictor
 from dials.array_family import flex
 from libtbx.utils import Abort, Sorry
@@ -35,6 +35,14 @@ LS49 {
     .help = path to jungfrau detector models that were indexed. Should be path to the experiment file including the file itself\
             Eg. /my/path/to/jungfrau_model/experiment.json \
             Note that this option should be provided if predict_spots is True
+  filter_close_spots = False
+    .type = bool
+    .help = Often on the jungfrau detector in LS49 spotfinder identified a visibly single spot to be two different spots because of \
+            some sort of splitting etc. When this flag is turned on, it uses a cutoff pixel radius to eliminate one of the spots based \
+            on the bbox size. It keeps the bigger spot and deletes the smaller spot. 
+  filter_centroids_dist_px = 10
+    .type = int
+    .help = critical centroid distance in pixels used to filter close spots and determine if two spots are too close to each other \
 }
 """
 phil_scope = parse(control_phil_str + dials_phil_str + LS49_phil_str, process_includes=True).fetch(parse(program_defaults_phil_str))
@@ -230,7 +238,7 @@ class SpotFinding_Script(Script):
             iterable = zip(tags, split_experiments, indices)
 
         # Process the data
-        if True: #params.mp.method == 'mpi':
+        if params.mp.method == 'mpi':
             from mpi4py import MPI
             comm = MPI.COMM_WORLD
             rank = comm.Get_rank() # each process in MPI has a unique id, 0-indexed
@@ -298,6 +306,8 @@ class SpotFinding_Script(Script):
                     per_image_analysis.print_table(stats)
                     logger.info(s.getvalue())
             comm.barrier() 
+        else:
+            do_work(0, iterable)
 
 class SpotFinding_Processor(Processor):
     def process_experiments(self, tag, experiments, img_id):
@@ -307,12 +317,6 @@ class SpotFinding_Processor(Processor):
         self.img_id = img_id
         self.tag = tag
         self.debug_start(tag)
-
-#    if not self.params.output.composite_output and self.params.output.datablock_filename:
-#      from dxtbx.datablock import DataBlockDumper
-#      dump = DataBlockDumper(datablock)
-#      dump.as_json(self.params.output.datablock_filename)
-
 
         try:
             if self.params.LS49.dump_CBF:
@@ -411,7 +415,7 @@ class SpotFinding_Processor(Processor):
         xyzobs = observed['xyzobs.px.value']
         for i in xrange(len(xyzobs)):
             xyzobs[i] = (xyzobs[i][0], xyzobs[i][1], 0)
-            bbox = observed['bbox']
+        bbox = observed['bbox']
         for i in xrange(len(bbox)):
             bbox[i] = (bbox[i][0], bbox[i][1], bbox[i][2], bbox[i][3], 0, 1)
 
@@ -420,12 +424,32 @@ class SpotFinding_Processor(Processor):
         else:
             # Save the reflections to file
             # Only save those which have spots
+            # Asmit LS49 specific stuff here
+            # Make sure 2 spots centroids are not within some cutoff. If so, please throw out the smaller spot
+            if len(observed) > 0 and self.params.LS49.filter_close_spots:
+                from scitbx.matrix import col
+                spots_to_delete = []
+                for ii, obs1 in enumerate(observed.rows()):
+                    for jj,obs2 in enumerate(observed.rows()):
+                        if ii == jj: continue
+                        dpx_centroid = (col(obs1['xyzobs.px.value']) - col(obs2['xyzobs.px.value'])).length()
+                        if dpx_centroid < self.params.LS49.filter_centroids_dist_px:
+                            box1_size = (obs1['bbox'][0]-obs1['bbox'][1])*(obs1['bbox'][2]-obs1['bbox'][3])
+                            box2_size = (obs2['bbox'][0]-obs2['bbox'][1])*(obs2['bbox'][2]-obs2['bbox'][3])
+                            if box1_size > box2_size:
+                                spots_to_delete.append(jj)
+                            else:
+                                spots_to_delete.append(ii)
+                spots_to_delete = list(set(spots_to_delete))
+                spots_to_delete_bool = flex.bool(len(observed), False)
+                for spot in spots_to_delete:
+                    spots_to_delete_bool[spot] = True
+                observed.del_selected(spots_to_delete_bool)
+
             logger.info('\n' + '-' * 80)
             if self.params.output.strong_filename and len(observed) > 0:
                 self.save_reflections(observed, self.params.output.strong_filename)
-                from dxtbx.model.experiment_list import ExperimentListDumper
-                dump = ExperimentListDumper(experiments)
-                dump.as_json(self.params.output.experiments_filename)
+                experiments.as_file(self.params.output.experiments_filename)
 
         logger.info('')
         logger.info('Time Taken = %f seconds' % (time() - st))
