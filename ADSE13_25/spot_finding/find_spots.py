@@ -195,9 +195,10 @@ class SpotFinding_Script(Script):
                     print ('READING IN TIMESTAMPS TO DUMP')
                     # Read in file with timestamps information
                     processor.timestamps_to_dump = []
-                    for fin in glob.glob(os.path.join(self.params.LS49.path_to_rayonix_crystal_models, 'int-0-*')):
+                    for fin in glob.glob(os.path.join(self.params.LS49.path_to_rayonix_crystal_models, 'idx-fee_data*')):
+                    #for fin in glob.glob(os.path.join(self.params.LS49.path_to_rayonix_crystal_models, 'int-0-*')):
                       int_file=os.path.basename(fin)
-                      ts = int_file[6:23] 
+                      ts = int_file[13:30] 
                       processor.timestamps_to_dump.append(ts)
                     #with open(os.path.join(self.params.output.output_dir,'../timestamps_to_dump.dat'), 'r') as fin:
                     #    for line in fin:
