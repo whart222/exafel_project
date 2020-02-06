@@ -1,0 +1,10 @@
+#!/bin/bash
+#BSUB -P CHM137
+#BSUB -W 0:59
+#BSUB -nnodes 64
+#BSUB -o lsf-%J.out
+#BSUB -e lsf-%J.err
+#BSUB -N
+#BSUB -alloc_flags "smt1 gpumps"
+
+jsrun bash merge_PSII.sh 
