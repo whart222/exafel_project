@@ -2,6 +2,8 @@ Installation script:
 
 https://github.com/ExaFEL/adse13_161/blob/master/summit/dials_py36/install_py36_dials.sh
 
+After the installation please overwrite the modules/ccp4io/libccp4/ccp4/library_file.c file with the file in this git folder. This is necessary to prevent ccp4 code from swapping bytes in mtz files on Summit. Then re-run make.
+
 Submitting a merging batch job:
 
 bsub merge_LD91.lsf
