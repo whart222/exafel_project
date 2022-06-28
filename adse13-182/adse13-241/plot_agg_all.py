@@ -15,6 +15,7 @@ colorlist = ["greenish blue", "dark mint green", "green yellow", "sunflower yell
 colorlist = colorlist + colorlist
 colorlist = ["xkcd:" + color for color in colorlist]
 linetypes = {"adse13-241":"-","adse13-249":"--","adse13-241/from_felix":":"}
+mtypes = {"adse13-241":".","adse13-249":"s","adse13-241/from_felix":"."}
 
 for target in ("adse13-241","adse13-249","adse13-241/from_felix"):
   with open("../../{}/work/aggregate.out".format(target), "r") as aggfile:
@@ -38,7 +39,7 @@ for target in ("adse13-249","adse13-241"):
     nnodes_sorted = sorted(nnodes)
     order = [nnodes.index(i) for i in nnodes_sorted]
     envtime_sorted = [envtime[i] for i in order]
-    ax.plot(nnodes_sorted, envtime_sorted, label="{} ranks/gpu, {}, {}".format(rpg, code, platform), color=colorlist.pop(0), marker="s", linestyle=linetypes[target])
+    ax.plot(nnodes_sorted, envtime_sorted, label="{} ranks/gpu, {}, {}".format(rpg, code, platform), color=colorlist.pop(0), marker=mtypes[target], linestyle=linetypes[target])
   if target == "adse13-249":
     ax.plot([10,20,40,80,160,320], [1000,500,250,125,62.5,31.25], label="ideal strong scaling", color="k", linestyle="-")
 for target in ("adse13-241/from_felix",):
@@ -50,7 +51,7 @@ for target in ("adse13-241/from_felix",):
     nnodes_sorted = sorted(nnodes)
     order = [nnodes.index(i) for i in nnodes_sorted]
     envtime_sorted = [envtime[i] for i in order]
-    ax.plot(nnodes_sorted, envtime_sorted, label="{} ranks/gpu, {}, {}".format(rpg, code, platform), color=colorlist_short.pop(0), marker="s", linestyle=linetypes[target])
+    ax.plot(nnodes_sorted, envtime_sorted, label="{} ranks/gpu, {}, {}".format(rpg, code, platform), color=colorlist_short.pop(0), marker=mtypes[target], linestyle=linetypes[target])
 ax.axvline(x=77, linewidth=1, color='k', linestyle=':')#, color='darkgray')
 ax.set_xscale('log',base=10)
 ax.set_yscale('log',base=10)
