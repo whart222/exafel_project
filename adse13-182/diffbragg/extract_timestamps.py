@@ -1,14 +1,15 @@
 import os
 import sys
-#import re
 import h5py
 from datetime import datetime
 import numpy as np
 from tqdm import tqdm
-from matplotlib import patches
-from matplotlib import collections
 
 logfiles = [f for f in os.listdir() if 'main_stage2.log' in f]
+
+if len(logfiles)==0:
+    print("Found no logfiles! Exiting.")
+    sys.exit()
 
 logs = []
 for name in tqdm(logfiles):
@@ -17,6 +18,7 @@ for name in tqdm(logfiles):
 
 
 timepoints = {}
+nodes = {}
 for line in tqdm(logs):
     ranknode, time, content = line.split(" | ")
     rank, node = ranknode.split(":")
@@ -27,161 +29,135 @@ for line in tqdm(logs):
     except KeyError:
         timepoints[rank] = []
         timepoints[rank].append({'time':time.timestamp(), 'msg':message})
+        nodes[rank] = node
+
+
+def get_template():
+    return {'start':[], 'end':[]}
 
 events = {}
 for rank in tqdm(timepoints):
-    iteration_start = []
-    update_Fcell_start = []
-    update_Fcell_end = []
-    add_diffBragg_spots_start = []
-    add_diffBragg_spots_end = []
+    startup = get_template()
+    refinement = get_template()
+    prep_dataframe = get_template()
+    from_json_file = get_template()
+    GatherFromExperiment = get_template()
+    MPI_barrier_startup = get_template()
+    gather_Hi_info = get_template()
+    setup = get_template()
+    iterations = get_template()
+    update_Fcell = get_template()
+    add_diffBragg_spots = get_template()
     shots = {}
-    MPI_barrier_starts = []
-    MPI_barrier_end = []
-    MPI_aggregation_starts = []
-    MPI_aggregation_end = []
+    MPI_barrier_iterations = get_template()
+    MPI_aggregation = get_template()
+
     for tp in timepoints[rank]:
         time = tp['time']
         msg = tp['msg']
-        if 'BEGIN FUNC GRAD ; iteration' in msg:
-            iteration_start.append(time)
-        elif 'start update Fcell' in msg:
-            update_Fcell_start.append(time)
-        elif 'done update Fcell' in msg:
-            update_Fcell_end.append(time)
-        elif 'run diffBragg for shot' in msg:
+
+        # A kingdom for a switch/case in python!
+        if "EVENT: read input pickle" in msg:
+            startup['start'].append(time)
+        elif "_launch done run setup" in msg:
+            startup['end'].append(time)
+
+        elif "_launcher runno setup" in msg:
+            refinement['start'].append(time)
+        elif "_launcher done runno setup" in msg:
+            refinement['end'].append(time)
+
+        elif "EVENT: BEGIN prep dataframe" in msg:
+            prep_dataframe['start'].append(time)
+        elif "EVENT: DONE prep dataframe" in msg:
+            prep_dataframe['end'].append(time)
+
+        elif "EVENT: BEGIN loading experiment list" in msg:
+            from_json_file['start'].append(time)
+        elif "EVENT: DONE loading experiment list" in msg:
+            from_json_file['end'].append(time)
+
+        elif "EVENT: LOADING ROI DATA" in msg:
+            GatherFromExperiment['start'].append(time)
+        elif "EVENT: DONE LOADING ROI" in msg:
+            GatherFromExperiment['end'].append(time)
+
+        elif "DONE LOADING DATA; ENTER BARRIER" in msg:
+            MPI_barrier_startup['start'].append(time)
+        elif "DONE LOADING DATA; EXIT BARRIER" in msg:
+            MPI_barrier_startup['end'].append(time)
+
+        elif "EVENT: Gathering global HKL information" in msg:
+            gather_Hi_info['start'].append(time)
+        elif "EVENT: FINISHED gather global HKL information" in msg:
+            gather_Hi_info['end'].append(time)
+
+        elif "Setup begins!" in msg:
+            setup['start'].append(time)
+        elif "Setup ends!" in msg:
+            setup['end'].append(time)
+
+        elif "BEGIN FUNC GRAD ; iteration" in msg:
+            iterations['start'].append(time)
+        elif "DONE WITH FUNC GRAD" in msg:
+            iterations['end'].append(time)
+
+        elif "start update Fcell" in msg:
+            update_Fcell['start'].append(time)
+        elif "done update Fcell" in msg:
+            update_Fcell['end'].append(time)
+
+        elif "run diffBragg for shot" in msg:
             shot_id = int(msg.split('shot')[1])
-            if shot_id in shots.keys():
-                shots[shot_id]['start'].append(time)
-            else:
-                shots[shot_id] = {'start':[time], 'end':[]}
-        elif 'finished diffBragg for shot' in msg:
+            if shot_id not in shots.keys():
+                shots[shot_id] = get_template()
+            shots[shot_id]['start'].append(time)
+        elif "finished diffBragg for shot" in msg:
             shot_id = int(msg.split('shot')[1])
-            if shot_id in shots.keys():
-                shots[shot_id]['end'].append(time)
-            else:
-                shots[shot_id] = {'start':[], 'end':[time]}
-        elif 'Time rank worked on shots' in msg:
+            if shot_id not in shots.keys():
+                shots[shot_id] = get_template()
+            shots[shot_id]['end'].append(time)
+
+        elif "Time rank worked on shots" in msg:
             shottime = float( msg.split('=')[1] )
-            add_diffBragg_spots_start.append(time-shottime)
-            add_diffBragg_spots_end.append(time)
-            MPI_barrier_starts.append(time)
+            add_diffBragg_spots['start'].append(time-shottime)
+            add_diffBragg_spots['end'].append(time)
+            MPI_barrier_iterations['start'].append(time)
         elif 'MPI aggregation of func and grad' in msg:
-            MPI_barrier_end.append(time)
-            MPI_aggregation_starts.append(time)
-        elif 'Time for MPIaggregation' in msg:
-            MPI_aggregation_end.append(time)
-    events[rank] = {'iteration':iteration_start,
-                    'Fcell_start':update_Fcell_start,
-                    'Fcell_end':update_Fcell_end,
-                    'diffBragg_start':add_diffBragg_spots_start,
-                    'diffBragg_end':add_diffBragg_spots_end,
-                    'shots':shots,
-                    'barrier_start':MPI_barrier_starts,
-                    'barrier_end':MPI_barrier_end,
-                    'aggregation_start':MPI_aggregation_starts,
-                    'aggregation_end':MPI_aggregation_end}
+            MPI_barrier_iterations['end'].append(time)
+            MPI_aggregation['start'].append(time)
+        elif "Time for MPIaggregation" in msg:
+            MPI_aggregation['end'].append(time)
+
+    events[rank] = {'startup': startup,
+                    'refinement': refinement,
+                    'prep_dataframe': prep_dataframe,
+                    'from_json_file': from_json_file,
+                    'GatherFromExperiment': GatherFromExperiment,
+                    'MPI_barrier_startup': MPI_barrier_startup,
+                    'gather_Hi_info': gather_Hi_info,
+                    'setup': setup,
+                    'iterations': iterations,
+                    'update_Fcell': update_Fcell,
+                    'add_diffBragg_spots': add_diffBragg_spots,
+                    'shots': shots,
+                    'MPI_barrier_iterations': MPI_barrier_iterations,
+                    'MPI_aggregation': MPI_aggregation}
 
 with h5py.File('timestamps.h5', 'w') as F:
     for rank in tqdm(timepoints):
         timetable = events[rank]
         grp_rank = F.create_group(rank)
-        grp_rank.create_dataset('iteration_start', data=np.array(timetable['iteration']))
-        grp_rank.create_dataset('update_Fcell/start', data=np.array(timetable['Fcell_start']))
-        grp_rank.create_dataset('update_Fcell/end', data=np.array(timetable['Fcell_end']))
-        grp_rank.create_dataset('add_diffBragg_spots/start', data=np.array(timetable['diffBragg_start']))
-        grp_rank.create_dataset('add_diffBragg_spots/end', data=np.array(timetable['diffBragg_end']))
-        grp_rank.create_dataset('MPI_barrier/start', data=np.array(timetable['barrier_start']))
-        grp_rank.create_dataset('MPI_barrier/end', data=np.array(timetable['barrier_end']))
-        grp_rank.create_dataset('MPI_aggregation/start', data=np.array(timetable['aggregation_start']))
-        grp_rank.create_dataset('MPI_aggregation/end', data=np.array(timetable['aggregation_end']))
+        grp_rank.attrs['node'] = nodes[rank]
+
+        for key in timetable:
+            if key == 'shots':
+                continue
+            grp_rank.create_dataset(key+'/start', data=np.array(timetable[key]['start']))
+            grp_rank.create_dataset(key+'/end', data=np.array(timetable[key]['end']))
+
         for shot_id in timetable['shots']:
             shot_start = timetable['shots'][shot_id]['start']
             shot_end = timetable['shots'][shot_id]['end']
             grp_rank.create_dataset('shots/%d/start'%shot_id, data=np.array(shot_start))
             grp_rank.create_dataset('shots/%d/end'%shot_id, data=np.array(shot_end))
-
-
-sys.exit()
-
-def get_color(r,g,b):
-    return r/255.,g/255.,b/255.
-
-def get_patches(tvals_start, tvals_stop, rank, tcolors):
-    patch_list = []
-    for i_t, (t1,t2) in enumerate(zip(tvals_start, tvals_stop)):
-        xy = np.array([(t1,rank-0.5), (t1, rank+0.5), (t2, rank+0.5), (t2, rank-0.5)])
-        patch = patches.Polygon(xy=xy, color=tcolors[i_t], closed=True) #, ec='k', lw=0.5)
-        patch_list.append(patch)
-    C = collections.PatchCollection(patch_list, match_original=True)
-    return C
-
-COLOR_green = get_color(105,183,100)
-COLOR_yellow = get_color(255,221,113)
-COLOR_red = get_color(242,108,100)
-COLOR_blue = get_color(113,221,255)
-
-ax = plt.gca()
-num_ranks = len(timepoints)
-max_t = max([events[r]['aggregation_end'][-1] for r in events])
-for rank in tqdm(range(num_ranks)):
-    timetable = events['RANK'+str(rank)]
-
-    # plot Fcell update in yellow
-    tstarts = timetable['Fcell_start']
-    tstops = timetable['Fcell_end']
-    tcolors = [COLOR_yellow]*len(timetable['Fcell_start'])
-
-    # plot add_diffBragg_spots in red
-    tstarts += timetable['diffBragg_start']
-    tstops += timetable['diffBragg_end']
-    tcolors += [COLOR_red]*len(timetable['diffBragg_start'])
-
-    #plot MPI barriers in blue
-    tstarts += timetable['barrier_start']
-    tstops += timetable['barrier_end']
-    tcolors += [COLOR_blue]*len(timetable['barrier_start'])
-
-    #plot MPI barriers in green
-    tstarts += timetable['aggregation_start']
-    tstops += timetable['aggregation_end']
-    tcolors += [COLOR_green]*len(timetable['aggregation_start'])
-
-    coll = get_patches(tstarts, tstops, rank=rank, tcolors=tcolors)
-    ax.add_collection(coll)
-    ax.tick_params(labelsize=8, pad=1)
-    ax.plot( timings['iteration'], [rank]*len(timings['iteration']), '*', mew=0, ms=4, color='k')
-
-for r in range(num_ranks+1):
-    ax.plot([0, max_t], [r-0.5, r-0.5], color='k', lw=0.33)
-
-plt.ylim(-.5,num_ranks-0.5)
-ax.set_xlabel("time after first iteration (seconds)", fontsize=12)
-ax.set_ylabel("rank number", fontsize=12)
-plt.xlim(0,max_t)
-plt.gcf().set_size_inches((6,3))
-
-
-
-patch_legend = [
-    patches.Patch(color=COLOR_yellow, ec='k', lw=0.5,label="update_Fcell"),
-    patches.Patch(color=COLOR_red, ec='k', lw=0.5, label='add_diffBragg_spots'),
-    patches.Patch(color=COLOR_blue, ec='k', lw=0.5, label='MPI barrier'),
-    patches.Patch(color=COLOR_green, ec='k', lw=0.5, label='MPI aggregation'),
-    patches.Patch(color='w', ec='k', lw=0.5, label='untracked'),
-    plt.plot([], [], ls="", marker='*', color='k',ms=5,mec=None,  label="Iteration begin")[0]
-]
-
-leg = ax.legend(handles=patch_legend, markerscale=1,
-                 bbox_to_anchor=(.99,0.5),
-                 prop={'size':7.5},
-                 loc="center left")
-
-fr = leg.get_frame()
-fr.set_alpha(1)
-fr.set_facecolor('w')
-fr.set_edgecolor('w')
-
-plt.subplots_adjust(right=0.8, bottom=0.15)
-
-plt.show()
