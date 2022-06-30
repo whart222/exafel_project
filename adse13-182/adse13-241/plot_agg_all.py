@@ -6,7 +6,7 @@ from matplotlib import ticker
 
 ranks_per_gpu_100000_evts_kokkos = {1:[],2:[],3:[],4:[],5:[],6:[],7:[],8:[]}
 ranks_per_gpu_100000_evts_cuda   = {1:[],2:[],3:[],4:[],5:[],6:[],7:[],8:[]}
-ranks_per_gpu_100000_evts_crusher= {1:[]}
+ranks_per_gpu_100000_evts_crusher= {2:[]}
 ranks_per_gpu_100000_evts = {"adse13-241":ranks_per_gpu_100000_evts_kokkos, "adse13-249":ranks_per_gpu_100000_evts_cuda, "adse13-241/from_felix":ranks_per_gpu_100000_evts_crusher}
 # data stored in each list: (nnodes, scalable time)
 #colorlist = ["bright lilac", "pure blue", "greenish blue", "dark mint green", "green yellow", "sunflower yellow", "tangerine", "cerise"]
@@ -15,7 +15,7 @@ colorlist = ["greenish blue", "dark mint green", "green yellow", "sunflower yell
 colorlist = colorlist + colorlist
 colorlist = ["xkcd:" + color for color in colorlist]
 linetypes = {"adse13-241":"-","adse13-249":"--","adse13-241/from_felix":":"}
-mtypes = {"adse13-241":".","adse13-249":"s","adse13-241/from_felix":"."}
+mtypes = {"adse13-241":"o","adse13-249":"s","adse13-241/from_felix":"o"}
 
 for target in ("adse13-241","adse13-249","adse13-241/from_felix"):
   with open("../../{}/work/aggregate.out".format(target), "r") as aggfile:
@@ -43,7 +43,7 @@ for target in ("adse13-249","adse13-241"):
   if target == "adse13-249":
     ax.plot([10,20,40,80,160,320], [1000,500,250,125,62.5,31.25], label="ideal strong scaling", color="k", linestyle="-")
 for target in ("adse13-241/from_felix",):
-  for rpg in (1,):
+  for rpg in (2,):
     code = "Kokkos"
     platform = "Crusher"
     data = ranks_per_gpu_100000_evts[target][rpg]
