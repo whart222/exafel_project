@@ -1,0 +1,26 @@
+# instructions for reproducing a cctbx.xfel installation on Perlmutter:
+
+cd $PSCRATCH
+mkdir xfel2
+cd xfel2
+git clone git@github.com:JBlaschke/alcc-recipes.git
+cd alcc-recipes/cctbx/
+./setup_arcticus.sh
+cd modules
+git clone https://github.com/nksauter/LS49
+git clone https://gitlab.com/cctbx/ls49_big_data
+git clone https://gitlab.com/cctbx/uc_metrics
+git clone https://github.com/lanl/lunus
+cd ..
+source activate.sh
+libtbx.configure LS49 ls49_big_data lunus uc_metrics
+conda install hdf5plugin pint -c conda-forge
+
+# testing the installation:
+
+salloc -N 1  -A m3562_g -t 20 -C gpu -q interactive -G 1
+mkdir test
+cd test
+srun -n 1 libtbx.run_tests_parallel nproc=64 module=LS49 module=simtbx
+. $PSCRATCH/xfel2/alcc-recipes/cctbx/activate.sh
+export DIFFBRAGG_USE_CUDA=1
